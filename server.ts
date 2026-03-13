@@ -56,8 +56,6 @@ async function startServer() {
     }
   });
 
-  // ... (rest of the routes stay the same)
-
   app.get("/api/contributions/all", async (req, res) => {
     const userId = req.headers["x-user-id"] || "mem-1";
     const { data: user } = await supabase
@@ -507,6 +505,7 @@ async function startServer() {
       res.status(500).json({ error: "Internal Server Error", message: err.message });
     }
   });
+
   app.get("/api/clan/:id/pages", async (req, res) => {
     const { data: pages, error } = await supabase
       .from("pages")
@@ -674,17 +673,19 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  // CRITICAL: Vite middleware for development ONLY
+  // This prevents the Rollup module error in Vercel production
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    // In production (Docker or Vercel static), serve from dist
+    // In production, serve from dist and handle SPA routing
     app.use(express.static(path.join(process.cwd(), "dist")));
-    app.get("*", (req, res) => {
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
       res.sendFile(path.join(process.cwd(), "dist", "index.html"));
     });
   }
@@ -707,6 +708,7 @@ async function startServer() {
   }
 }
 
-startServer();
+// Ensure the server starts
+startServer().catch(err => console.error("Failed to start server:", err));
 
 export default app;

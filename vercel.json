@@ -4,7 +4,9 @@
     {
       "src": "package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "config": {
+        "distDir": "dist"
+      }
     },
     {
       "src": "server.ts",
@@ -14,10 +16,15 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server.ts"
+      "dest": "server.ts",
+      "check": true
     },
     {
       "handle": "filesystem"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
     },
     {
       "src": "/(.*)",
