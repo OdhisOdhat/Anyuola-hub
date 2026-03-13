@@ -673,20 +673,25 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // CRITICAL: Vite middleware for development ONLY
-  // This prevents the Rollup module error in Vercel production
+  // --- PRODUCTION VS DEVELOPMENT HANDLING ---
+  // 
+  
   if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
+    // DEVELOPMENT: Use Vite middleware
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    // In production, serve from dist and handle SPA routing
-    app.use(express.static(path.join(process.cwd(), "dist")));
+    // PRODUCTION (Vercel): Serve from built dist folder
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    
     app.get("*", (req, res, next) => {
+      // Don't intercept API calls
       if (req.path.startsWith('/api')) return next();
-      res.sendFile(path.join(process.cwd(), "dist", "index.html"));
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
@@ -700,7 +705,7 @@ async function startServer() {
     });
   });
 
-  // Only listen if not in a serverless environment (like Vercel)
+  // Only listen on port if NOT on Vercel
   if (process.env.VERCEL !== "1") {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
