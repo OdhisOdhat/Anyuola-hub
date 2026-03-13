@@ -1,0 +1,5 @@
+{
+  "name": "My Anyuola App",
+  "description": "A digital operating system for clans and community trust networks, featuring welfare management, security alerts, and project tracking.",
+  "requestFramePermissions": ["geolocation"]
+}

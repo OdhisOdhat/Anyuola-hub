@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Libre Baskerville", serif;
+  
+  /* Map the dynamic CSS variable to a Tailwind color */
+  --color-brand: var(--brand-primary, #10b981);
+  --color-brand-light: color-mix(in srgb, var(--brand-primary, #10b981) 10%, transparent);
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-zinc-900 antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Global focus ring branding */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand/50;
+  }
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-zinc-100;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    /* Uses brand color for the scrollbar thumb */
+    @apply bg-brand/30 rounded-full hover:bg-brand/60 transition-colors;
+  }
+
+  /* Utility for brand-colored shadows */
+  .shadow-brand {
+    box-shadow: 0 10px 15px -3px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  }
+}
+
+.markdown-body {
+  @apply prose prose-zinc max-w-none;
+}
+
+.markdown-body h1 { @apply text-2xl font-bold mb-4; }
+.markdown-body h2 { @apply text-xl font-semibold mb-3; }
+.markdown-body p { @apply mb-4 leading-relaxed; }
+.markdown-body ul { @apply list-disc pl-5 mb-4; }
+.markdown-body li { @apply mb-1; }
+
+.glass-card {
+  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+}
+
+/* Custom selection color matching the brand */
+::selection {
+  @apply bg-brand/20 text-brand;
+}
