@@ -11,12 +11,20 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+// Initialize Supabase client – updated to better match .env naming + server convention
+const supabaseUrl = 
+  process.env.SUPABASE_URL || 
+  process.env.VITE_SUPABASE_URL || 
+  "";
+
+const supabaseAnonKey = 
+  process.env.SUPABASE_ANON_KEY || 
+  process.env.VITE_SUPABASE_ANON_KEY || 
+  "";
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error("CRITICAL: Supabase environment variables are missing!");
+  console.error("Expected: SUPABASE_URL / VITE_SUPABASE_URL  and  SUPABASE_ANON_KEY / VITE_SUPABASE_ANON_KEY");
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -674,7 +682,6 @@ async function startServer() {
   });
 
   // --- PRODUCTION VS DEVELOPMENT HANDLING ---
-  // 
   
   if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
     // DEVELOPMENT: Use Vite middleware
