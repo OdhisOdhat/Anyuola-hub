@@ -4,11 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "concurrently \"vite\" \"tsx server.ts\"",
     "build": "vite build",
-    "preview": "vite preview",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "start": "tsx server.ts",
+    "vercel": "vercel",
+    "vercel:dev": "vercel dev",
+    "clean": "rm -rf dist .vercel",
+    "lint": "tsc --noEmit",
+    "postbuild": "echo 'Build complete. dist/ ready for Vercel static serving.'"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -40,7 +43,11 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
