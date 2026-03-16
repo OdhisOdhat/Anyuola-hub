@@ -230,7 +230,7 @@ app.get("/api/me", async (req, res) => {
     
     const { data: currentUser } = await supabase!
       .from("members")
-      .select("role")
+      .select("role, subgroup")
       .eq("id", userId)
       .single();
 
@@ -242,10 +242,12 @@ app.get("/api/me", async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
 
     // Conceal phone numbers if not admin or subgroup_manager
-    const canSeePhone = currentUser && (currentUser.role === 'admin' || currentUser.role === 'subgroup_manager');
+    const isAdminOrManager = currentUser && (currentUser.role === 'admin' || currentUser.role === 'subgroup_manager');
     
     const sanitizedMembers = members.map(m => {
-      if (!canSeePhone && m.id !== userId) {
+      const isSameSubgroup = currentUser && m.subgroup === currentUser.subgroup && m.subgroup !== null;
+      // Show phone if: admin/manager OR own profile OR same subgroup
+      if (!isAdminOrManager && m.id !== userId && !isSameSubgroup) {
         const { phone, ...rest } = m;
         return { ...rest, phone: "Hidden" };
       }

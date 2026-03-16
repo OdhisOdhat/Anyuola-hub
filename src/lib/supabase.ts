@@ -55,3 +55,24 @@ export const updateClanBranding = async (clanId: string, updates: {
   if (error) throw error;
   return data;
 };
+
+// 3. Upload Profile Picture
+export const uploadProfilePicture = async (file: File, memberId: string) => {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${memberId}-avatar-${Date.now()}.${fileExt}`;
+  const filePath = `${fileName}`;
+
+  // Upload file to the 'avatars' bucket
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  // Get the public URL
+  const { data } = supabase.storage
+    .from('avatars')
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+};

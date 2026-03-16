@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { updateMember, fetchMe } from "../lib/api";
-import { User, MapPin, Home, Users, Save, CheckCircle } from "lucide-react";
+import { uploadProfilePicture } from "../lib/supabase";
+import { User, MapPin, Home, Users, Save, CheckCircle, Camera, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Profile() {
   const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -51,6 +53,27 @@ export default function Profile() {
     }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploading(true);
+    try {
+      const publicUrl = await uploadProfilePicture(file, user.id);
+      setFormData(prev => ({ ...prev, photo_url: publicUrl }));
+      // Also update immediately in DB
+      await updateMember(user.id, { ...formData, photo_url: publicUrl });
+      await refreshProfile();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Failed to upload image. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -63,17 +86,33 @@ export default function Profile() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-1 space-y-6">
           <div className="p-6 bg-white rounded-3xl border border-zinc-200 shadow-sm text-center space-y-4">
-            <div className="w-24 h-24 bg-brand-50 rounded-full flex items-center justify-center mx-auto text-brand overflow-hidden">
-              {formData.photo_url ? (
-                <img 
-                  src={formData.photo_url} 
-                  alt={user.name} 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
+            <div className="relative w-24 h-24 mx-auto group">
+              <div className="w-24 h-24 bg-brand-50 rounded-full flex items-center justify-center text-brand overflow-hidden border-2 border-zinc-100">
+                {formData.photo_url ? (
+                  <img 
+                    src={formData.photo_url} 
+                    alt={user.name} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <User className="w-12 h-12" />
+                )}
+              </div>
+              <label className="absolute bottom-0 right-0 p-2 bg-zinc-900 text-white rounded-full cursor-pointer hover:bg-zinc-800 transition-all shadow-lg">
+                {uploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  disabled={uploading}
                 />
-              ) : (
-                <User className="w-12 h-12" />
-              )}
+              </label>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-400 uppercase tracking-tighter">Profile Photo URL</label>
