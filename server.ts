@@ -1,6 +1,5 @@
 import express from "express";
 import "express-async-errors";
-import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -11,6 +10,9 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const isVercel = process.env.VERCEL === "1";
+const isProd = process.env.NODE_ENV === "production" || isVercel;
+
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
@@ -19,14 +21,32 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error("CRITICAL: Supabase environment variables are missing!");
 }
 
-const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
-  : null;
+let supabase: any = null;
+try {
+  if (supabaseUrl && supabaseAnonKey) {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+  }
+} catch (err) {
+  console.error("CRITICAL: Failed to initialize Supabase client:", err);
+}
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Simple test route
+app.get("/api/test", (req, res) => res.send("OK"));
+
+// Health check route
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    supabaseConfigured: !!supabase,
+    env: process.env.NODE_ENV,
+    isVercel
+  });
+});
 
 // Middleware to check Supabase configuration
 app.use((req, res, next) => {
@@ -66,8 +86,6 @@ app.get("/api/me", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error", message: err.message });
   }
 });
-
-  // ... (rest of the routes stay the same)
 
   app.get("/api/contributions/all", async (req, res) => {
     const userId = req.headers["x-user-id"] || "mem-1";
@@ -132,7 +150,7 @@ app.get("/api/me", async (req, res) => {
 
   app.patch("/api/events/:id", async (req, res) => {
     const userId = req.headers["x-user-id"] || "mem-1";
-    const { data: user } = await supabase
+    const { data: user } = await supabase!
       .from("members")
       .select("role")
       .eq("id", userId)
@@ -560,7 +578,7 @@ app.get("/api/me", async (req, res) => {
   app.get("/api/clan/:id/blogs", async (req, res) => {
     const { data: blogs, error } = await supabase!
       .from("blogs")
-      .select("*, author:members(name)")
+      .select("*, author:members!author_id(name)")
       .eq("clan_id", req.params.id)
       .order("created_at", { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
@@ -641,7 +659,7 @@ app.get("/api/me", async (req, res) => {
     const userId = req.headers["x-user-id"] || "mem-1";
     const { data: messages, error } = await supabase!
       .from("messages")
-      .select("*, sender:members(name)")
+      .select("*, sender:members!sender_id(name)")
       .or(`receiver_id.eq.${userId},is_broadcast.eq.true`)
       .order("created_at", { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
@@ -686,15 +704,17 @@ app.get("/api/me", async (req, res) => {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProd) {
+    const { createServer: createViteServer } = await import("vite");
     createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     }).then(vite => {
       app.use(vite.middlewares);
     });
-  } else {
-    // In production (Docker or Vercel static), serve from dist
+  } else if (!isVercel) {
+    // In production (Docker/Local), serve from dist
+    // On Vercel, static files are handled by Vercel's edge network
     app.use(express.static(path.join(process.cwd(), "dist")));
     app.get("*", (req, res) => {
       res.sendFile(path.join(process.cwd(), "dist", "index.html"));

@@ -43,6 +43,19 @@ async function getHeaders(): Promise<{ [key: string]: string }> {
   return headerPromise;
 }
 
+async function handleResponse(res: Response) {
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`API Error [${res.status}]: ${text}`);
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { error: "Server Error", message: text };
+    }
+  }
+  return res.json();
+}
+
 /**
  * BRANDING & CLAN MANAGEMENT
  */
@@ -50,7 +63,7 @@ async function getHeaders(): Promise<{ [key: string]: string }> {
 export async function fetchClan(id: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${id}`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updateClanBranding(id: string, data: any) {
@@ -60,7 +73,7 @@ export async function updateClanBranding(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -70,7 +83,7 @@ export async function updateClanBranding(id: string, data: any) {
 export async function fetchMe() {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/me`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -80,7 +93,7 @@ export async function fetchMe() {
 export async function fetchMembers(clanId: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${clanId}/members`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function createMember(member: any) {
@@ -90,7 +103,7 @@ export async function createMember(member: any) {
     headers,
     body: JSON.stringify(member),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updateMember(id: string, data: any) {
@@ -100,7 +113,7 @@ export async function updateMember(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -110,7 +123,7 @@ export async function updateMember(id: string, data: any) {
 export async function fetchEvents(clanId: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${clanId}/events`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function createEvent(event: any) {
@@ -120,7 +133,7 @@ export async function createEvent(event: any) {
     headers,
     body: JSON.stringify(event),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updateEvent(id: string, data: any) {
@@ -130,7 +143,7 @@ export async function updateEvent(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -140,7 +153,7 @@ export async function updateEvent(id: string, data: any) {
 export async function fetchProjects(clanId: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${clanId}/projects`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function createProject(project: any) {
@@ -150,7 +163,7 @@ export async function createProject(project: any) {
     headers,
     body: JSON.stringify(project),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updateProject(id: string, data: any) {
@@ -160,7 +173,7 @@ export async function updateProject(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -170,7 +183,7 @@ export async function updateProject(id: string, data: any) {
 export async function fetchAlerts(clanId: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${clanId}/alerts`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function createAlert(alert: any) {
@@ -180,7 +193,7 @@ export async function createAlert(alert: any) {
     headers,
     body: JSON.stringify(alert),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updateAlert(id: string, data: any) {
@@ -190,7 +203,7 @@ export async function updateAlert(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -200,7 +213,7 @@ export async function updateAlert(id: string, data: any) {
 export async function fetchAllContributions() {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/contributions/all`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function createContribution(contribution: any) {
@@ -210,7 +223,7 @@ export async function createContribution(contribution: any) {
     headers,
     body: JSON.stringify(contribution),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updateContribution(id: string, data: any) {
@@ -220,7 +233,7 @@ export async function updateContribution(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -230,7 +243,7 @@ export async function updateContribution(id: string, data: any) {
 export async function fetchPages(clanId: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${clanId}/pages`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function createPage(page: any) {
@@ -240,7 +253,7 @@ export async function createPage(page: any) {
     headers,
     body: JSON.stringify(page),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updatePage(id: string, data: any) {
@@ -250,7 +263,7 @@ export async function updatePage(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -260,7 +273,7 @@ export async function updatePage(id: string, data: any) {
 export async function fetchBlogs(clanId: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${clanId}/blogs`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function createBlog(blog: any) {
@@ -270,7 +283,7 @@ export async function createBlog(blog: any) {
     headers,
     body: JSON.stringify(blog),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updateBlog(id: string, data: any) {
@@ -280,7 +293,7 @@ export async function updateBlog(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -290,7 +303,7 @@ export async function updateBlog(id: string, data: any) {
 export async function fetchAds(clanId: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${clanId}/ads`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function createAd(ad: any) {
@@ -300,7 +313,7 @@ export async function createAd(ad: any) {
     headers,
     body: JSON.stringify(ad),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function updateAd(id: string, data: any) {
@@ -310,13 +323,13 @@ export async function updateAd(id: string, data: any) {
     headers,
     body: JSON.stringify(data),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function fetchFinancialReport(clanId: string) {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/clan/${clanId}/financial-report`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 /**
@@ -326,7 +339,7 @@ export async function fetchFinancialReport(clanId: string) {
 export async function fetchMessages() {
   const headers = await getHeaders();
   const res = await fetch(`${API_BASE}/messages`, { headers });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function sendMessage(message: any) {
@@ -336,7 +349,7 @@ export async function sendMessage(message: any) {
     headers,
     body: JSON.stringify(message),
   });
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function markMessageRead(id: string) {
@@ -345,5 +358,5 @@ export async function markMessageRead(id: string) {
     method: "PATCH",
     headers,
   });
-  return res.json();
+  return handleResponse(res);
 }
