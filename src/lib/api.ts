@@ -9,6 +9,7 @@ const HEADER_CACHE_TTL = 60000; // 1 minute
 
 async function getHeaders(): Promise<{ [key: string]: string }> {
   const now = Date.now();
+  console.log("getHeaders called");
   
   // Return cached headers if still valid
   if (cachedHeaders && (now - lastHeaderFetch < HEADER_CACHE_TTL)) {
@@ -23,8 +24,10 @@ async function getHeaders(): Promise<{ [key: string]: string }> {
   // Create a new promise for the header fetch
   headerPromise = (async () => {
     try {
+      console.log("Fetching session for headers...");
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session?.user?.id || "mem-1";
+      console.log("Session found, userId:", userId);
       
       const headers = {
         "Content-Type": "application/json",
@@ -35,6 +38,9 @@ async function getHeaders(): Promise<{ [key: string]: string }> {
       cachedHeaders = headers;
       lastHeaderFetch = Date.now();
       return headers;
+    } catch (error) {
+      console.error("Error in getHeaders:", error);
+      throw error;
     } finally {
       headerPromise = null;
     }
@@ -44,6 +50,7 @@ async function getHeaders(): Promise<{ [key: string]: string }> {
 }
 
 async function handleResponse(res: Response) {
+  console.log(`Response received: ${res.status} ${res.ok}`);
   if (!res.ok) {
     const text = await res.text();
     console.error(`API Error [${res.status}]: ${text}`);
@@ -81,9 +88,19 @@ export async function updateClanBranding(id: string, data: any) {
  */
 
 export async function fetchMe() {
-  const headers = await getHeaders();
-  const res = await fetch(`${API_BASE}/me`, { headers });
-  return handleResponse(res);
+  console.log("fetchMe called");
+  try {
+    const headers = await getHeaders();
+    console.log("fetchMe headers:", headers);
+    const url = `${window.location.origin}${API_BASE}/me`;
+    console.log("fetchMe fetching URL:", url);
+    const res = await fetch(url, { headers });
+    console.log("fetchMe response status:", res.status);
+    return handleResponse(res);
+  } catch (error) {
+    console.error("fetchMe error:", error);
+    throw error;
+  }
 }
 
 /**

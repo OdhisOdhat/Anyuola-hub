@@ -178,11 +178,11 @@ VALUES (
   primary_color = EXCLUDED.primary_color;
 
 INSERT INTO members (id, name, phone, clan_id, role) 
-VALUES ('mem-1', 'John Doe', '0712345678', 'clan-1', 'admin')
+VALUES ('mem-1', 'John Doe', '0712345678', 'clan-1', 'member')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO members (id, name, phone, clan_id, role) 
-VALUES ('mem-wuora', 'Wuora Odhis', '0700000000', 'clan-1', 'admin')
+VALUES ('mem-wuora', 'Wuora Odhis', '0700000000', 'clan-1', 'member')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO projects (id, title, description, status, progress, clan_id) 

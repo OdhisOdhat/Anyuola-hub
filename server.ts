@@ -1,10 +1,12 @@
 import express from "express";
 import "express-async-errors";
+import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
+console.log("SERVER.TS STARTING...");
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +19,9 @@ const isProd = process.env.NODE_ENV === "production" || isVercel;
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 
+console.log("Supabase URL present:", !!supabaseUrl);
+console.log("Supabase Anon Key present:", !!supabaseAnonKey);
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error("CRITICAL: Supabase environment variables are missing!");
 }
@@ -25,6 +30,9 @@ let supabase: any = null;
 try {
   if (supabaseUrl && supabaseAnonKey) {
     supabase = createClient(supabaseUrl, supabaseAnonKey);
+    console.log("Supabase client initialized successfully");
+  } else {
+    console.log("Supabase client NOT initialized - missing credentials");
   }
 } catch (err) {
   console.error("CRITICAL: Failed to initialize Supabase client:", err);
@@ -33,10 +41,20 @@ try {
 const app = express();
 const PORT = 3000;
 
+app.use(cors());
 app.use(express.json());
 
+// Request logger
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
 // Simple test route
-app.get("/api/test", (req, res) => res.send("OK"));
+app.get("/api/test", (req, res) => {
+  console.log("TEST ROUTE HIT");
+  res.send("OK");
+});
 
 // Health check route
 app.get("/api/health", (req, res) => {
@@ -64,13 +82,26 @@ app.get("/api/me", async (req, res) => {
   const userId = req.headers["x-user-id"] || "mem-1"; 
   const userEmail = req.headers["x-user-email"];
 
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase not initialized" });
+  }
+
   try {
+    // Check if this is the primary admin
     if (userEmail === 'fodhis1@gmail.com') {
-      // Auto-elevate this specific user to admin
-      await supabase!
+      const { data: existingUser } = await supabase!
         .from("members")
-        .update({ role: 'admin' })
-        .eq("id", userId);
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      if (existingUser && existingUser.role !== 'admin') {
+        // Auto-elevate this specific user to admin if not already
+        await supabase!
+          .from("members")
+          .update({ role: 'admin' })
+          .eq("id", userId);
+      }
     }
 
     const { data: user, error } = await supabase!
@@ -225,12 +256,25 @@ app.get("/api/me", async (req, res) => {
   });
 
   app.post("/api/members", async (req, res) => {
+    const userId = req.headers["x-user-id"] || "mem-1";
+    
+    // Check if caller is admin
+    const { data: caller } = await supabase!
+      .from("members")
+      .select("role")
+      .eq("id", userId)
+      .single();
+
     const { name, phone, clan_id, role, subgroup, village, father_name, residence } = req.body;
+    
+    // Only admin can set a role other than 'member'
+    const finalRole = (caller?.role === 'admin') ? (role || 'member') : 'member';
+    
     const id = `mem-${Date.now()}`;
     const { error } = await supabase!
       .from("members")
       .insert([{ 
-        id, name, phone, clan_id, role: role || 'member', subgroup, village, father_name, residence 
+        id, name, phone, clan_id, role: finalRole, subgroup, village, father_name, residence 
       }]);
 
     if (error) return res.status(500).json({ error: error.message });
@@ -731,11 +775,9 @@ app.get("/api/me", async (req, res) => {
     });
   });
 
-  // Only listen if not in a serverless environment (like Vercel)
-  if (process.env.VERCEL !== "1") {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
+  // Always listen on the specified port
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  });
 
 export default app;
