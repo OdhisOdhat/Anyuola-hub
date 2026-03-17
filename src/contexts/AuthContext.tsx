@@ -54,7 +54,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initAuth = async () => {
       try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Session fetch error:", error);
+          if (error.message.includes("Refresh Token Not Found") || error.message.includes("Invalid Refresh Token")) {
+            console.warn("Invalid refresh token detected, signing out...");
+            await supabase.auth.signOut();
+            if (mounted) {
+              setSession(null);
+              setUser(null);
+            }
+            return;
+          }
+        }
         
         if (initialSession && mounted) {
           setSession(initialSession);

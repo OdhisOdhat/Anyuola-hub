@@ -25,7 +25,24 @@ async function getHeaders(): Promise<{ [key: string]: string }> {
   headerPromise = (async () => {
     try {
       console.log("Fetching session for headers...");
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error("Session fetch error in getHeaders:", error);
+        if (error.message.includes("Refresh Token Not Found") || error.message.includes("Invalid Refresh Token")) {
+          console.warn("Invalid refresh token in getHeaders, signing out...");
+          await supabase.auth.signOut();
+          const fallbackHeaders = {
+            "Content-Type": "application/json",
+            "x-user-id": "mem-1",
+            "x-user-email": ""
+          };
+          cachedHeaders = fallbackHeaders;
+          lastHeaderFetch = Date.now();
+          return fallbackHeaders;
+        }
+      }
+
       const userId = session?.user?.id || "mem-1";
       console.log("Session found, userId:", userId);
       

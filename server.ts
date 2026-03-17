@@ -470,10 +470,14 @@ app.get("/api/me", async (req, res) => {
   app.post("/api/contributions", async (req, res) => {
     const { member_id, event_id, amount, payment_reference } = req.body;
     const id = `cont-${Date.now()}`;
+    
+    // Handle guest contributions
+    const finalMemberId = member_id === 'guest-user' ? null : member_id;
+
     const { error } = await supabase!
       .from("contributions")
       .insert([{ 
-        id, member_id, event_id, amount, payment_reference 
+        id, member_id: finalMemberId, event_id, amount, payment_reference 
       }]);
 
     if (error) return res.status(500).json({ error: error.message });

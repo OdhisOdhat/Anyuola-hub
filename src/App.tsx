@@ -77,7 +77,11 @@ export default function App() {
             <Route path="/security" element={<ProtectedRoute><Security /></ProtectedRoute>} />
             <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
             <Route path="/contributions" element={<ProtectedRoute><Contributions /></ProtectedRoute>} />
-            <Route path="/contribute" element={<ProtectedRoute><Contribute /></ProtectedRoute>} />
+            <Route path="/contribute" element={
+              <ThemeManager>
+                <Layout><Contribute /></Layout>
+              </ThemeManager>
+            } />
             <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/financial-report" element={<ProtectedRoute><FinancialReport /></ProtectedRoute>} />

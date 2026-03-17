@@ -96,6 +96,9 @@ CREATE TABLE IF NOT EXISTS contributions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure member_id is nullable if it wasn't already (it is by default in the CREATE TABLE above, but let's be explicit if we were to alter it)
+-- ALTER TABLE contributions ALTER COLUMN member_id DROP NOT NULL;
+
 -- 7. Create Subgroups Table
 CREATE TABLE IF NOT EXISTS subgroups (
   id TEXT PRIMARY KEY,
