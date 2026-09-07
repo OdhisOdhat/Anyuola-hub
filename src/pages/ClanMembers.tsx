@@ -91,16 +91,15 @@ export default function ClanMembers() {
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-zinc-200">
         <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-[10px] font-bold uppercase tracking-widest mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest mb-4">
             <Users className="w-3 h-3" />
-            Community Directory
+            Mifuong'o Raruoch Directory
           </div>
           <h1 className="text-4xl font-black text-zinc-900 tracking-tight">
-            Clan Members
+            Members & Lineages
           </h1>
           <p className="text-zinc-500 mt-2 text-lg leading-relaxed">
-            Directory of all registered community members. Manage roles, permissions, 
-            and contact information for our growing network.
+            Directory of registered community members across North Kadem and the diaspora, indexed by ancestral lineages and sub-families.
           </p>
         </div>
         <div className="flex gap-3 shrink-0">
@@ -298,14 +297,32 @@ export default function ClanMembers() {
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 ml-1">Subgroup Name</label>
+                      <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 ml-1">Subgroup / Lineage</label>
                       <input
                         type="text"
+                        list="lineages-list"
                         value={newMember.subgroup}
                         onChange={(e) => setNewMember({...newMember, subgroup: e.target.value})}
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold"
-                        placeholder="e.g., Young Professionals"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all font-bold"
+                        placeholder="Select or enter lineage (e.g. Joka Ogiro Magota)"
                       />
+                      <datalist id="lineages-list">
+                        <option value="Joka Ogiro Magota" />
+                        <option value="Joka Tagaya Obware" />
+                        <option value="Joka Moth" />
+                        <option value="Joka Nyakara" />
+                        <option value="Joka Obwanga" />
+                        <option value="Joka Ong'ele Osodhi" />
+                        <option value="Joka Saronge" />
+                        <option value="Joka Otugi Ajwang" />
+                        <option value="Joka Ogambi" />
+                        <option value="Jokabwai" />
+                        <option value="Joka Owuonda Kuba" />
+                        <option value="Joka Omach Maraki" />
+                        <option value="Joka Ngeta Ondego" />
+                        <option value="Joka Otieno Suta" />
+                        <option value="North Kadem Diaspora" />
+                      </datalist>
                     </div>
                     <div>
                       <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 ml-1">Village Name</label>

@@ -121,16 +121,16 @@ export default function Dashboard() {
             }}
           >
             <TrendingUp className="w-3 h-3" />
-            {clan?.tagline || "Community Operating System"}
+            {clan?.tagline || "Self-Help Group (S.H.G) Reg. 2019 • Kadem Kanyuor"}
           </motion.div>
           <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4 flex items-center gap-4">
             {clan?.logo_url && (
               <img src={clan.logo_url} className="w-12 h-12 object-contain" alt="Logo" />
             )}
-            Welcome to {clan?.name || "My Anyuola App"}
+            Welcome to {clan?.name || "MIFUONG'O RARUOCH ORGANIZATION"}
           </h1>
           <p className="text-zinc-400 text-lg leading-relaxed">
-            {clan?.description || "Empowering our community through digital trust."}
+            {clan?.description || "Improving the socioeconomic and geopolitical wellbeing of our people through unity of purpose and pooling of resources for mutual aid."}
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
             <Link 
@@ -251,6 +251,64 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Community & Leadership in Action Dispatches */}
+      <div className="space-y-4 pt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold flex items-center gap-2 text-zinc-900">
+            <Users className="w-5 h-5 text-emerald-600" /> Leadership in Action
+          </h2>
+          <Link to="/about#lineage" className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+            View All Documentation <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
+            <div className="aspect-[16/10] overflow-hidden bg-zinc-100 relative">
+              <img 
+                src="/images/bursary-issuance.jpg" 
+                alt="The leadership issuing bursary cheques to needy students"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                referrerPolicy="no-referrer"
+              />
+              <span className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-zinc-950/80 text-emerald-400 text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">
+                Education Bursary
+              </span>
+            </div>
+            <div className="p-5 space-y-2">
+              <h3 className="font-bold text-zinc-900 text-base leading-snug">
+                The leadership issuing bursary cheques to needy students.
+              </h3>
+              <p className="text-xs text-zinc-500 line-clamp-2">
+                Executive team and Education Committee formally handing over bursary support to students in North Kadem.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
+            <div className="aspect-[16/10] overflow-hidden bg-zinc-100 relative">
+              <img 
+                src="/images/leadership-consultation.jpg" 
+                alt="The leadership consulting with civil leaders on development matters"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                referrerPolicy="no-referrer"
+              />
+              <span className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-zinc-950/80 text-blue-400 text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">
+                Civil Deliberations
+              </span>
+            </div>
+            <div className="p-5 space-y-2">
+              <h3 className="font-bold text-zinc-900 text-base leading-snug">
+                The leadership consulting with civil leaders on development matters.
+              </h3>
+              <p className="text-xs text-zinc-500 line-clamp-2">
+                Strategic leadership synod convening with regional civil stakeholders to discuss socioeconomic infrastructure and mutual aid.
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -301,16 +301,30 @@ export default function Contribute() {
             </div>
           </div>
 
-          <div className="bg-blue-600 rounded-3xl p-8 text-white relative overflow-hidden group">
-            <Heart className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 -rotate-12 transition-transform group-hover:scale-110" />
-            <div className="relative space-y-4">
-              <h3 className="text-xl font-black tracking-tight">Your Impact</h3>
-              <p className="text-sm text-blue-100 leading-relaxed">
-                Last month, Anyuola members contributed over KES 150,000 to support 
-                4 families with medical and education expenses.
-              </p>
-              <div className="pt-4 flex items-center gap-2 text-xs font-black uppercase tracking-widest">
-                See Community Impact <ArrowRight className="w-4 h-4" />
+          <div className="bg-blue-600 rounded-3xl overflow-hidden text-white relative group shadow-xl">
+            <div className="relative h-44 w-full overflow-hidden">
+              <img 
+                src="/images/african-children-donate.jpg" 
+                alt="African Children Supported by Education Bursary"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/40 to-transparent flex items-end p-4">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 backdrop-blur-md px-2.5 py-1 rounded-full text-white border border-white/20">
+                  200+ Students Sponsored Yearly
+                </span>
+              </div>
+            </div>
+            <div className="p-8 relative space-y-4">
+              <Heart className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 -rotate-12 transition-transform group-hover:scale-110" />
+              <div className="relative space-y-2">
+                <h3 className="text-xl font-black tracking-tight">Your Direct Impact</h3>
+                <p className="text-sm text-blue-100 leading-relaxed font-medium">
+                  Mifuong'o Raruoch members and well-wishers pool resources to sponsor over 200 students annually with bursaries, meet medical and burial expenses, and build homes for the elderly and widows.
+                </p>
+                <div className="pt-2 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-blue-200">
+                  Transforming Lives Across North Kadem
+                </div>
               </div>
             </div>
           </div>

@@ -172,12 +172,14 @@ CREATE TABLE IF NOT EXISTS messages (
 INSERT INTO clans (id, name, tagline, description, primary_color) 
 VALUES (
   'clan-1', 
-  'My Anyuola App', 
-  'TRUST NETWORK', 
-  'A vibrant community dedicated to mutual support and development.',
+  'MIFUONG'O RARUOCH ORGANIZATION', 
+  'Self-Help Group (S.H.G) Reg. 2019 • Kadem Kanyuor', 
+  'Founded to improve socioeconomic and geopolitical wellbeing through unity of purpose and pooling of resources for mutual aid.',
   '#10b981'
 ) ON CONFLICT (id) DO UPDATE SET 
+  name = EXCLUDED.name,
   tagline = EXCLUDED.tagline, 
+  description = EXCLUDED.description,
   primary_color = EXCLUDED.primary_color;
 
 INSERT INTO members (id, name, phone, clan_id, role) 

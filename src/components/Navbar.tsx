@@ -35,8 +35,8 @@ export default function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [branding, setBranding] = useState({
-    name: "My Anyuola App",
-    tagline: "Trust Network",
+    name: "MIFUONG'O RARUOCH ORGANIZATION",
+    tagline: "Self-Help Group (S.H.G) • North Kadem",
     logo_url: null as string | null,
     primary_color: "#10b981", // Default Emerald
   });

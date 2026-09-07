@@ -20,7 +20,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="text-zinc-500 text-sm text-center md:text-left">
-              <p>© 2026 My Anyuola App. Digitizing trust networks.</p>
+              <p>© 2026 MIFUONG'O RARUOCH ORGANIZATION. Mutual aid & community empowerment.</p>
               <p className="mt-1">
                 developed by{" "}
                 <a 

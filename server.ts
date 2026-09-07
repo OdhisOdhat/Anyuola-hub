@@ -217,11 +217,40 @@ app.get("/api/me", async (req, res) => {
         .eq("id", req.params.id)
         .single();
       
-      if (error) return res.status(404).json({ error: "Clan not found", details: error.message });
+      if (error || !clan) {
+        return res.json({
+          id: req.params.id,
+          name: "MIFUONG'O RARUOCH ORGANIZATION",
+          tagline: "Self-Help Group (S.H.G) Reg. 2019 • Kadem Kanyuor",
+          description: "Mifuong'o Raruoch is a community organization formed to improve the socioeconomic and geopolitical wellbeing of the people as well as support the vulnerable and the needy population through promoting unity of purpose and pooling of resources for mutual aid.",
+          primary_color: "#10b981",
+          secondary_color: "#064e3b"
+        });
+      }
+
+      // If the database has an older default name, seamlessly update to official organization name
+      if (clan.name === "My Anyuola App" || clan.name === "CommunityHub") {
+        clan.name = "MIFUONG'O RARUOCH ORGANIZATION";
+        clan.tagline = "Self-Help Group (S.H.G) Reg. 2019 • Kadem Kanyuor";
+        clan.description = "Mifuong'o Raruoch is a community organization formed to improve the socioeconomic and geopolitical wellbeing of the people as well as support the vulnerable and the needy population through promoting unity of purpose and pooling of resources for mutual aid.";
+        supabase!.from("clans").update({
+          name: clan.name,
+          tagline: clan.tagline,
+          description: clan.description
+        }).eq("id", req.params.id).then();
+      }
+
       res.json(clan);
     } catch (err: any) {
       console.error("Error in /api/clan/:id:", err);
-      res.status(500).json({ error: "Internal Server Error", message: err.message });
+      res.json({
+        id: req.params.id,
+        name: "MIFUONG'O RARUOCH ORGANIZATION",
+        tagline: "Self-Help Group (S.H.G) Reg. 2019 • Kadem Kanyuor",
+        description: "Mifuong'o Raruoch is a community organization formed to improve the socioeconomic and geopolitical wellbeing of the people as well as support the vulnerable and the needy population through promoting unity of purpose and pooling of resources for mutual aid.",
+        primary_color: "#10b981",
+        secondary_color: "#064e3b"
+      });
     }
   });
 

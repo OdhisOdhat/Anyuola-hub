@@ -1,5 +1,10 @@
 {
-  "name": "My Anyuola App",
-  "description": "A digital operating system for clans and community trust networks, featuring welfare management, security alerts, and project tracking.",
-  "requestFramePermissions": ["geolocation"]
+  "name": "MIFUONG'O RARUOCH ORGANIZATION",
+  "description": "Mifuong'o Raruoch Organization (S.H.G) is a community organization in North Kadem formed to improve socioeconomic wellbeing, promote unity of purpose, and pool resources for mutual aid, education bursaries, and welfare.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

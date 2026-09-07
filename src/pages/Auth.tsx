@@ -110,8 +110,8 @@ export default function Auth() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-600 rounded-2xl shadow-xl shadow-emerald-600/20 mb-4">
             <Users className="text-white w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-black text-zinc-900 tracking-tight">CommunityHub</h1>
-          <p className="text-zinc-500 font-medium mt-2">Digitizing trust networks.</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight">MIFUONG'O RARUOCH ORGANIZATION</h1>
+          <p className="text-zinc-500 font-medium text-sm mt-2">Self-Help Group (S.H.G) • Reg. 2019 • North Kadem</p>
         </div>
 
         <motion.div 
