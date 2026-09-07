@@ -19,8 +19,8 @@ export default function FinancialReport() {
   const loadReport = async () => {
     try {
       setError(null);
-      const data = await fetchFinancialReport(user!.clan_id);
-      if (data.error) throw new Error(data.error);
+      const data: any = await fetchFinancialReport(user!.clan_id);
+      if (data?.error) throw new Error(data.error);
       setReport(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error("Failed to load financial report", err);

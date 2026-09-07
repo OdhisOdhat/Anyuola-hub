@@ -585,6 +585,26 @@ export default function About() {
               ))}
             </ul>
 
+            {/* Official Paybill Details Card */}
+            <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 block">
+                Official Donation Paybill (Lipa na M-Pesa)
+              </span>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white p-2.5 rounded-xl border border-zinc-200/80">
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase block">Business No.</span>
+                  <span className="font-mono font-black text-zinc-900 text-sm">522522</span>
+                </div>
+                <div className="bg-white p-2.5 rounded-xl border border-zinc-200/80">
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase block">A/C Number</span>
+                  <span className="font-mono font-black text-zinc-900 text-sm">1322197253</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-zinc-500 font-semibold pt-1">
+                Account Name: <strong className="text-zinc-900">Mifuong'o Ruruoch SHG</strong>
+              </p>
+            </div>
+
             <Link 
               to="/contribute?guest=true"
               className="w-full sm:w-auto px-10 py-5 bg-rose-500 text-white rounded-2xl font-black text-lg hover:bg-rose-600 transition-all shadow-xl shadow-rose-500/30 flex items-center justify-center gap-3"
@@ -725,15 +745,19 @@ export default function About() {
 
                 <div className="p-6 bg-zinc-900 rounded-3xl text-white space-y-4">
                   <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Paybill</span>
-                    <span className="font-mono font-black text-emerald-400">714777</span>
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Paybill (Lipa na M-Pesa)</span>
+                    <span className="font-mono font-black text-emerald-400 text-lg">522522</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Account</span>
-                    <span className="font-mono font-black text-emerald-400">0727774129</span>
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Account (A/C)</span>
+                    <span className="font-mono font-black text-emerald-400 text-lg">1322197253</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Account Name</span>
+                    <span className="font-bold text-white text-sm">Mifuong'o Ruruoch SHG</span>
                   </div>
                   <p className="text-[10px] text-zinc-400 text-center uppercase font-black tracking-wider">
-                    Support Logistics (Mifuong'o Raruoch Portal)
+                    Official Donation Account • North Kadem
                   </p>
                 </div>
 

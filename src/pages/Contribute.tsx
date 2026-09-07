@@ -9,7 +9,9 @@ import {
   ArrowRight,
   AlertCircle,
   ChevronRight,
-  Gift
+  Gift,
+  Copy,
+  Check
 } from "lucide-react";
 import { fetchEvents, createContribution } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -27,6 +29,13 @@ export default function Contribute() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2500);
+  };
 
   const [formData, setFormData] = useState({
     event_id: initialEventId,
@@ -40,11 +49,16 @@ export default function Contribute() {
     async function loadData() {
       try {
         const eventsData = await fetchEvents(clanId);
-        setEvents(eventsData.filter((e: any) => e.status === 'active'));
+        const activeEvents = Array.isArray(eventsData) 
+          ? eventsData.filter((e: any) => e.status === 'active') 
+          : [];
+        setEvents(activeEvents);
         
         // If event_id was in URL, ensure it's set in form data after events load
         if (initialEventId) {
           setFormData(prev => ({ ...prev, event_id: initialEventId }));
+        } else if (activeEvents.length > 0) {
+          setFormData(prev => ({ ...prev, event_id: prev.event_id || activeEvents[0].id }));
         }
       } catch (err) {
         console.error("Failed to load data", err);
@@ -260,6 +274,75 @@ export default function Contribute() {
         </div>
 
         <div className="lg:col-span-2 space-y-8">
+          {/* Official Paybill Summary Card */}
+          <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 rounded-3xl p-7 text-white border border-emerald-500/20 shadow-xl space-y-5 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/30">
+                Official Paybill
+              </span>
+              <span className="text-xs text-zinc-400 font-semibold">Lipa na M-Pesa</span>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Account Name</p>
+              <h4 className="text-xl font-black text-white tracking-tight">Mifuong'o Ruruoch SHG</h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              {/* Business Number Box */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Business No.</p>
+                  <p className="text-2xl font-black font-mono text-emerald-400">522522</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard("522522", "biz")}
+                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all text-xs font-bold flex items-center gap-1.5"
+                  title="Copy Business Number"
+                >
+                  {copiedField === "biz" ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span className="text-[11px] text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span className="text-[11px]">Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Account Number Box */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">A/C Number</p>
+                  <p className="text-2xl font-black font-mono text-emerald-400">1322197253</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard("1322197253", "acct")}
+                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all text-xs font-bold flex items-center gap-1.5"
+                  title="Copy Account Number"
+                >
+                  {copiedField === "acct" ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span className="text-[11px] text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span className="text-[11px]">Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-zinc-900 rounded-3xl p-8 text-white space-y-6">
             <h3 className="text-xl font-black tracking-tight">Payment Instructions</h3>
             <div className="space-y-4">
@@ -274,18 +357,25 @@ export default function Contribute() {
                 <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-black shrink-0">2</div>
                 <div className="space-y-1">
                   <p className="font-bold text-sm">Enter Business Number</p>
-                  <p className="text-xs text-zinc-400 font-mono">714777 (Support Logistics)</p>
+                  <p className="text-xs text-emerald-400 font-mono font-bold">522522</p>
                 </div>
               </div>
               <div className="flex gap-4">
                 <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-black shrink-0">3</div>
                 <div className="space-y-1">
                   <p className="font-bold text-sm">Enter Account Number</p>
-                  <p className="text-xs text-zinc-400 font-mono">0727774129</p>
+                  <p className="text-xs text-emerald-400 font-mono font-bold">1322197253</p>
                 </div>
               </div>
               <div className="flex gap-4">
                 <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-black shrink-0">4</div>
+                <div className="space-y-1">
+                  <p className="font-bold text-sm">Verify Account Name</p>
+                  <p className="text-xs text-zinc-300 font-semibold">Confirm recipient is <strong className="text-white">Mifuong'o Ruruoch SHG</strong></p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-black shrink-0">5</div>
                 <div className="space-y-1">
                   <p className="font-bold text-sm">Enter Amount & PIN</p>
                   <p className="text-xs text-zinc-400">Complete the transaction on your phone.</p>
@@ -295,8 +385,7 @@ export default function Contribute() {
             <div className="pt-6 border-t border-white/10">
               <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Important Note</p>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Please ensure you enter the correct M-Pesa reference code in the form to help us 
-                reconcile your payment quickly.
+                Please enter the received M-Pesa transaction code (e.g. QJD78KL...) in the form above so the treasurer can automatically verify and issue your receipt.
               </p>
             </div>
           </div>
