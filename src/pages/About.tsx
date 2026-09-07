@@ -19,7 +19,8 @@ import {
   Landmark, 
   Search,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Camera
 } from "lucide-react";
 
 const fadeIn = {
@@ -391,6 +392,15 @@ export default function About() {
           <p className="text-zinc-600 text-sm sm:text-base font-medium">
             Active engagement on the ground: disbursing bursary cheques to bright needy students and consulting with civil and community leaders on socioeconomic development.
           </p>
+          <div className="pt-2">
+            <Link 
+              to="/gallery" 
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+            >
+              <Camera className="w-3.5 h-3.5 text-emerald-400" />
+              Explore Full Photo Gallery Archives &rarr;
+            </Link>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">

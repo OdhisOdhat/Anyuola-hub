@@ -10,6 +10,7 @@ import Projects from "./pages/Projects";
 import Contributions from "./pages/Contributions";
 import Contribute from "./pages/Contribute";
 import About from "./pages/About";
+import Gallery from "./pages/Gallery";
 import Auth from "./pages/Auth";
 import MemberManagement from "./pages/MemberManagement";
 import AdminCMS from "./pages/AdminCMS";
@@ -71,6 +72,7 @@ export default function App() {
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Layout><About /></Layout>} />
+            <Route path="/gallery" element={<Layout><Gallery /></Layout>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/members" element={<ProtectedRoute><ClanMembers /></ProtectedRoute>} />
             <Route path="/welfare" element={<ProtectedRoute><Welfare /></ProtectedRoute>} />

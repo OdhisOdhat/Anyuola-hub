@@ -18,7 +18,8 @@ import {
   Mail,
   FileText,
   Settings,
-  Bell
+  Bell,
+  Camera
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
@@ -82,6 +83,7 @@ export default function Navbar() {
   }, [user?.clan_id]);
 
   const communityItems = [
+    { name: "Photo Gallery", path: "/gallery", icon: Camera },
     { name: "Members", path: "/members", icon: Users },
     { name: "Welfare", path: "/welfare", icon: HeartHandshake },
     { name: "Security", path: "/security", icon: ShieldAlert },
@@ -148,6 +150,17 @@ export default function Navbar() {
               style={location.pathname === "/" ? { color: branding.primary_color, backgroundColor: `${branding.primary_color}10` } : {}}
             >
               Home
+            </Link>
+
+            <Link
+              to="/gallery"
+              className={cn(
+                "px-3 py-2 rounded-xl text-sm font-bold transition-all",
+                location.pathname === "/gallery" ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
+              )}
+              style={location.pathname === "/gallery" ? { color: branding.primary_color, backgroundColor: `${branding.primary_color}10` } : {}}
+            >
+              Gallery
             </Link>
 
             {user && (
@@ -393,6 +406,13 @@ export default function Navbar() {
                 className="block px-4 py-3 rounded-xl text-base font-bold text-zinc-900 hover:bg-zinc-50"
               >
                 Home
+              </Link>
+              <Link
+                to="/gallery"
+                onClick={() => setIsOpen(false)}
+                className="block px-4 py-3 rounded-xl text-base font-bold text-zinc-900 hover:bg-zinc-50"
+              >
+                Gallery
               </Link>
               {user && (
                 <>
