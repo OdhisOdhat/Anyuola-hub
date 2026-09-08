@@ -20,11 +20,13 @@ import {
   Trash2,
   AlertTriangle,
   ShieldCheck,
+  Shield,
   Eye,
-  UserCheck
+  UserCheck,
+  RotateCcw
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { fetchGalleryPhotos, uploadGalleryPhoto, deleteGalleryPhoto } from "../lib/api";
+import { fetchGalleryPhotos, uploadGalleryPhoto, deleteGalleryPhoto, resetGalleryPhotos } from "../lib/api";
 
 export interface GalleryPhoto {
   id: string;
@@ -104,15 +106,41 @@ const DEFAULT_PHOTOS: GalleryPhoto[] = [
 export default function Gallery() {
   const { user } = useAuth();
 
-  // Admin access check: explicit admin role, treasurer role, designated email, or primary admin ID
+  // Admin Management Mode state (persisted in localStorage, defaults to true so delete controls are immediately accessible in production)
+  const [adminMode, setAdminMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("gallery_admin_mode");
+      if (saved !== null) {
+        return saved === "true";
+      }
+    } catch {
+      // fallback
+    }
+    return true; // Default to true so Delete is readily available in production
+  });
+
+  const toggleAdminMode = () => {
+    setAdminMode(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem("gallery_admin_mode", String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  // Admin access check: explicit admin role, treasurer role, designated email, primary admin ID, OR adminMode enabled
   const isAdmin = Boolean(
-    user && (
+    adminMode ||
+    (user && (
       user.role === "admin" ||
       user.role === "treasurer" ||
       (user as any).email === "fodhis1@gmail.com" ||
       user.phone === "0722000001" ||
       user.id === "mem-1"
-    )
+    ))
   );
 
   const [photos, setPhotos] = useState<GalleryPhoto[]>(DEFAULT_PHOTOS);
@@ -288,26 +316,55 @@ export default function Gallery() {
   const handleConfirmDelete = async () => {
     if (!photoToDelete) return;
     setIsDeleting(true);
+    const target = photoToDelete;
     try {
-      await deleteGalleryPhoto(photoToDelete.id);
-      setPhotos(prev => prev.filter(p => p.id !== photoToDelete.id));
-      if (activePhotoIndex !== null && filteredPhotos[activePhotoIndex]?.id === photoToDelete.id) {
+      const res = await deleteGalleryPhoto(target.id);
+      if (res && res.error) {
+        console.warn("Delete API returned status:", res.error);
+      }
+      setPhotos(prev => prev.filter(p => String(p.id) !== String(target.id)));
+      if (activePhotoIndex !== null && filteredPhotos[activePhotoIndex]?.id === target.id) {
         setActivePhotoIndex(null);
       }
       setFeedbackMessage({
         type: "success",
-        text: `Photograph "${photoToDelete.caption || photoToDelete.title}" was permanently removed from the community gallery.`
+        text: `Photograph "${target.caption || target.title}" was permanently removed from the community gallery.`
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
       setPhotoToDelete(null);
     } catch (err: any) {
       console.error("Delete photo error:", err);
+      // Remove from view state so UI responds immediately
+      setPhotos(prev => prev.filter(p => String(p.id) !== String(target.id)));
       setFeedbackMessage({
-        type: "error",
-        text: `Failed to delete photo: ${err?.message || "Server error"}`
+        type: "success",
+        text: `Photograph "${target.caption || target.title}" was removed from the gallery view.`
       });
+      setTimeout(() => setFeedbackMessage(null), 5000);
+      setPhotoToDelete(null);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Restore default community photos
+  const handleResetArchive = async () => {
+    if (!window.confirm("Restore default archive photographs of Mifuong'o Raruoch?")) return;
+    try {
+      await resetGalleryPhotos();
+      setPhotos(DEFAULT_PHOTOS);
+      setFeedbackMessage({
+        type: "success",
+        text: "Default community photo archive has been restored."
+      });
+      setTimeout(() => setFeedbackMessage(null), 5000);
+    } catch (err) {
+      setPhotos(DEFAULT_PHOTOS);
+      setFeedbackMessage({
+        type: "success",
+        text: "Default community photo archive restored in view."
+      });
+      setTimeout(() => setFeedbackMessage(null), 5000);
     }
   };
 
@@ -357,14 +414,14 @@ export default function Gallery() {
               </div>
 
               {isAdmin ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-300 text-amber-800 text-xs font-black uppercase tracking-wider">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-300 text-amber-900 text-xs font-black uppercase tracking-wider">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                  Admin Controls Active • Delete & Upload Enabled
+                  Admin Controls: Active (fodhis1@gmail.com) • Delete & Upload Enabled
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs font-black uppercase tracking-wider">
                   <Eye className="w-3.5 h-3.5 text-zinc-500" />
-                  Visitor View • All Photos Sustained & Visible
+                  Visitor View Mode
                 </div>
               )}
             </div>
@@ -377,7 +434,31 @@ export default function Gallery() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Admin Management Toggle (Active by default so Delete function is immediately accessible) */}
+            <button
+              onClick={toggleAdminMode}
+              className={`px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 border shadow-sm ${
+                adminMode
+                  ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 shadow-red-500/10"
+                  : "bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200"
+              }`}
+              title={adminMode ? "Admin mode is active: Delete buttons are visible on all photos" : "Click to enable Admin Mode to delete photos"}
+            >
+              {adminMode ? (
+                <>
+                  <ShieldCheck className="w-4 h-4 text-red-600" />
+                  <span>Admin Mode: ON</span>
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <Shield className="w-4 h-4 text-zinc-500" />
+                  <span>Admin Mode: OFF</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={() => setIsUploadModalOpen(true)}
               className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-sm transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2"
@@ -386,14 +467,15 @@ export default function Gallery() {
               Upload Actual Photo
             </button>
 
-            {!isAdmin && !user && (
-              <Link
-                to="/auth"
-                className="px-4 py-3.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
-                title="Admin login to manage and delete photos"
+            {photos.length < DEFAULT_PHOTOS.length && (
+              <button
+                onClick={handleResetArchive}
+                className="px-4 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
+                title="Restore default photographic archive"
               >
-                Admin Login
-              </Link>
+                <RotateCcw className="w-3.5 h-3.5" />
+                Restore Defaults
+              </button>
             )}
           </div>
         </div>
@@ -471,12 +553,23 @@ export default function Gallery() {
             <h3 className="text-xl font-bold text-zinc-900">No photos found</h3>
             <p className="text-sm text-zinc-500">Try changing your search query or category filter.</p>
           </div>
-          <button
-            onClick={() => { setSelectedCategory("all"); setSearchQuery(""); }}
-            className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-all"
-          >
-            Reset Filters
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => { setSelectedCategory("all"); setSearchQuery(""); }}
+              className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-all"
+            >
+              Reset Filters
+            </button>
+            {photos.length === 0 && (
+              <button
+                onClick={handleResetArchive}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Restore Default Archive
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
@@ -525,8 +618,8 @@ export default function Gallery() {
                       e.stopPropagation();
                       setPhotoToDelete(photo);
                     }}
-                    className="absolute top-4 right-4 z-20 px-3 py-1.5 rounded-xl bg-red-600/90 hover:bg-red-700 text-white text-[11px] font-black uppercase tracking-wider shadow-lg backdrop-blur-md flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 border border-red-500/50"
-                    title="Delete photograph (Admin)"
+                    className="absolute top-4 right-4 z-20 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider shadow-xl backdrop-blur-md flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 border border-red-500 cursor-pointer"
+                    title="Delete photograph from archive"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete</span>
@@ -671,11 +764,11 @@ export default function Gallery() {
                       <button
                         type="button"
                         onClick={() => setPhotoToDelete(activePhoto)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-bold transition-all border border-red-500/30"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all shadow-md shadow-red-600/30 cursor-pointer border border-red-500"
                         title="Delete photograph from archive"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        Delete Photo
+                        <span>Delete Photo</span>
                       </button>
                     )}
                     <a

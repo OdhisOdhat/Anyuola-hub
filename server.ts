@@ -409,6 +409,16 @@ function saveGalleryStore(photos: any[]) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(GALLERY_STORAGE_FILE, JSON.stringify(photos, null, 2), "utf-8");
+    
+    // Also sync to dist/gallery.json if dist directory exists
+    const distGalleryFile = path.join(process.cwd(), "dist", "gallery.json");
+    if (fs.existsSync(path.dirname(distGalleryFile))) {
+      try {
+        fs.writeFileSync(distGalleryFile, JSON.stringify(photos, null, 2), "utf-8");
+      } catch (distErr) {
+        // ignore
+      }
+    }
   } catch (err) {
     console.error("[Gallery] Failed to write gallery.json:", err);
   }
@@ -1191,7 +1201,17 @@ app.post("/api/gallery", async (req, res) => {
 app.delete("/api/gallery/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const photoIndex = localStore.gallery.findIndex(p => p.id === id);
+    if (!localStore.gallery || localStore.gallery.length === 0) {
+      localStore.gallery = loadGalleryStore();
+    }
+
+    let photoIndex = localStore.gallery.findIndex(p => String(p.id) === String(id));
+    if (photoIndex === -1) {
+      // Re-read file just in case it was modified
+      localStore.gallery = loadGalleryStore();
+      photoIndex = localStore.gallery.findIndex(p => String(p.id) === String(id));
+    }
+
     if (photoIndex === -1) {
       return res.status(404).json({ error: "Photo not found in archive" });
     }
@@ -1199,17 +1219,25 @@ app.delete("/api/gallery/:id", async (req, res) => {
     const photoToDelete = localStore.gallery[photoIndex];
 
     // If it's an uploaded file in public/images/ (not the base price1-4 photos), clean it up from disk
-    if (photoToDelete.src && photoToDelete.src.startsWith("/images/")) {
+    if (photoToDelete.src && photoToDelete.src.includes("/images/")) {
       const filename = path.basename(photoToDelete.src);
       const isBaseImage = /^(price[1-4]\.jpe?g)$/i.test(filename);
       if (!isBaseImage) {
-        const filePath = path.join(process.cwd(), "public", "images", filename);
-        if (fs.existsSync(filePath)) {
+        const publicFilePath = path.join(process.cwd(), "public", "images", filename);
+        if (fs.existsSync(publicFilePath)) {
           try {
-            fs.unlinkSync(filePath);
+            fs.unlinkSync(publicFilePath);
             console.log(`[Gallery] Deleted file from disk: ${filename}`);
           } catch (fileErr) {
             console.warn(`[Gallery] Error unlinking ${filename}:`, fileErr);
+          }
+        }
+        const distFilePath = path.join(process.cwd(), "dist", "images", filename);
+        if (fs.existsSync(distFilePath)) {
+          try {
+            fs.unlinkSync(distFilePath);
+          } catch (dErr) {
+            // ignore
           }
         }
       }
@@ -1217,11 +1245,22 @@ app.delete("/api/gallery/:id", async (req, res) => {
 
     localStore.gallery.splice(photoIndex, 1);
     saveGalleryStore(localStore.gallery);
-    console.log(`[Gallery] Admin deleted photo ${id}. Remaining: ${localStore.gallery.length}`);
+    console.log(`[Gallery] Successfully deleted photo ${id}. Remaining: ${localStore.gallery.length}`);
     res.json({ success: true, id, message: "Photograph deleted from community archive" });
   } catch (err: any) {
     console.error("[Gallery] Error deleting photo:", err);
     res.status(500).json({ error: "Failed to delete photo", message: err.message });
+  }
+});
+
+// Restore default archive photos
+app.post("/api/gallery/reset", async (req, res) => {
+  try {
+    localStore.gallery = [...DEFAULT_GALLERY_PHOTOS];
+    saveGalleryStore(localStore.gallery);
+    res.json({ success: true, message: "Restored default archive photos", gallery: localStore.gallery });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to reset gallery", message: err.message });
   }
 });
 
@@ -1235,6 +1274,8 @@ if (!isProd) {
     app.use(vite.middlewares);
   });
 } else if (!isVercel) {
+  app.use("/images", express.static(path.join(process.cwd(), "public", "images")));
+  app.use(express.static(path.join(process.cwd(), "public")));
   app.use(express.static(path.join(process.cwd(), "dist")));
   app.get("*", (req, res) => {
     res.sendFile(path.join(process.cwd(), "dist", "index.html"));

@@ -727,3 +727,11 @@ export async function deleteGalleryPhoto(id: string) {
   });
   return handleResponse(res);
 }
+
+export async function resetGalleryPhotos() {
+  const res = await fetch(`${API_BASE}/gallery/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" }
+  });
+  return handleResponse(res);
+}
