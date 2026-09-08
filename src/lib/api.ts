@@ -665,3 +665,65 @@ export async function markMessageRead(id: string) {
   });
   return handleResponse(res);
 }
+
+/**
+ * GALLERY & ACTUAL PHOTO ARCHIVES (Sustained & Visible to All Visitors)
+ */
+
+export async function fetchGalleryPhotos() {
+  try {
+    const res = await fetch(`${API_BASE}/gallery`, {
+      headers: { "Content-Type": "application/json" }
+    });
+    const data = await handleResponse(res);
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+  } catch (err) {
+    console.warn("fetchGalleryPhotos API call error, trying static fallback:", err);
+  }
+
+  // Resilient fallback to static /gallery.json for visitors
+  try {
+    const staticRes = await fetch("/gallery.json");
+    if (staticRes.ok) {
+      const staticData = await staticRes.json();
+      if (Array.isArray(staticData) && staticData.length > 0) {
+        return staticData;
+      }
+    }
+  } catch (staticErr) {
+    console.warn("Static gallery.json fallback failed:", staticErr);
+  }
+
+  return [];
+}
+
+export async function uploadGalleryPhoto(photoData: any) {
+  let headers: Record<string, string> = { "Content-Type": "application/json" };
+  try {
+    headers = await getHeaders();
+  } catch (err) {
+    console.warn("Failed to get auth headers for upload, using fallback:", err);
+  }
+  const res = await fetch(`${API_BASE}/gallery`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(photoData),
+  });
+  return handleResponse(res);
+}
+
+export async function deleteGalleryPhoto(id: string) {
+  let headers: Record<string, string> = { "Content-Type": "application/json" };
+  try {
+    headers = await getHeaders();
+  } catch (err) {
+    console.warn("Failed to get auth headers for delete, using fallback:", err);
+  }
+  const res = await fetch(`${API_BASE}/gallery/${id}`, {
+    method: "DELETE",
+    headers,
+  });
+  return handleResponse(res);
+}

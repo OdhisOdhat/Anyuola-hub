@@ -3,6 +3,7 @@ import "express-async-errors";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
@@ -50,6 +51,7 @@ const localStore: {
   pages: any[];
   blogs: any[];
   ads: any[];
+  gallery: any[];
 } = {
   clan: {
     id: "clan-1",
@@ -309,8 +311,111 @@ const localStore: {
   ],
   pages: [] as any[],
   blogs: [] as any[],
-  ads: [] as any[]
+  ads: [] as any[],
+  gallery: [] as any[]
 };
+
+// Persistent Gallery File Setup
+const GALLERY_STORAGE_FILE = path.join(process.cwd(), "public", "gallery.json");
+
+const DEFAULT_GALLERY_PHOTOS = [
+  {
+    id: "photo-1",
+    filename: "Price1.jpeg",
+    src: "/images/Price1.jpeg",
+    title: "Bursary Cheques Issuance",
+    caption: "The leadership issuing bursary cheques to needy students.",
+    description: "Executive leaders and the Education Committee of Mifuong'o Raruoch Organization formally distributing scholarship bursary cheques to bright, needy students in North Kadem.",
+    category: "bursary",
+    categoryLabel: "Education Bursaries",
+    date: "Annual Academic Award",
+    location: "North Kadem Community Synod Hall",
+    badgeColor: "bg-emerald-500 text-white",
+    uploaded_by: "Fred Abich (Chairman)"
+  },
+  {
+    id: "photo-2",
+    filename: "price2.jpeg",
+    src: "/images/price2.jpeg",
+    title: "Civil Leadership Consultation",
+    caption: "The leadership consulting with civil leaders on development matters.",
+    description: "Mifuong'o Raruoch elders and executive leadership convening an outdoor consultative strategic synod with regional civil stakeholders to discuss sustainable development priorities.",
+    category: "consultation",
+    categoryLabel: "Civil Consultations",
+    date: "Leadership Synod",
+    location: "Green Garden Pavilion, North Kadem",
+    badgeColor: "bg-blue-600 text-white",
+    uploaded_by: "Fred Abich (Chairman)"
+  },
+  {
+    id: "photo-3",
+    filename: "price3.jpeg",
+    src: "/images/price3.jpeg",
+    title: "Committee Vetting & Due Diligence",
+    caption: "The committee actively vetting bursary applications and verifying needy students.",
+    description: "Working session of committee secretaries, advisors, and leadership examining student bursary application registers and evaluating urgent welfare assistance requests.",
+    category: "committee",
+    categoryLabel: "Governance & Vetting",
+    date: "Committee Working Session",
+    location: "Executive Secretariat Desk",
+    badgeColor: "bg-purple-600 text-white",
+    uploaded_by: "Philip Opiyo Odero (Secretary)"
+  },
+  {
+    id: "photo-4",
+    filename: "price4.jpeg",
+    src: "/images/price4.jpeg",
+    title: "Community Welfare Assembly",
+    caption: "Community welfare assembly and bursary disbursement ceremony.",
+    description: "Mifuong'o Raruoch community gathering in North Kadem bringing together parents, elders, and beneficiaries during the mutual aid distribution ceremony.",
+    category: "welfare",
+    categoryLabel: "Welfare & Assembly",
+    date: "General Assembly",
+    location: "Community Assembly Hall",
+    badgeColor: "bg-amber-600 text-white",
+    uploaded_by: "Paul Aran Onditi (Treasurer)"
+  }
+];
+
+function loadGalleryStore(): any[] {
+  try {
+    if (fs.existsSync(GALLERY_STORAGE_FILE)) {
+      const raw = fs.readFileSync(GALLERY_STORAGE_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn("[Gallery] Error reading gallery.json, initializing defaults:", err);
+  }
+  // Initialize default file if not found or corrupted
+  try {
+    const dir = path.dirname(GALLERY_STORAGE_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(GALLERY_STORAGE_FILE, JSON.stringify(DEFAULT_GALLERY_PHOTOS, null, 2), "utf-8");
+  } catch (writeErr) {
+    console.warn("[Gallery] Could not create initial gallery.json:", writeErr);
+  }
+  return [...DEFAULT_GALLERY_PHOTOS];
+}
+
+function saveGalleryStore(photos: any[]) {
+  try {
+    const dir = path.dirname(GALLERY_STORAGE_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(GALLERY_STORAGE_FILE, JSON.stringify(photos, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Gallery] Failed to write gallery.json:", err);
+  }
+}
+
+// Populate local store on startup
+localStore.gallery = loadGalleryStore();
 
 // Helper: check if Supabase is alive without throwing
 async function trySupabase<T>(fn: () => Promise<T>): Promise<{ data: T | null; error: any }> {
@@ -333,7 +438,8 @@ const app = express();
 const PORT = 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Request logger
 app.use((req, res, next) => {
@@ -989,6 +1095,134 @@ app.post("/api/messages", async (req, res) => {
 });
 app.patch("/api/messages/:id/read", async (req, res) => {
   res.json({ success: true });
+});
+
+// --- Photo Gallery & Direct Raw Photo Upload ---
+app.get("/api/gallery", async (req, res) => {
+  if (!localStore.gallery || localStore.gallery.length === 0) {
+    localStore.gallery = loadGalleryStore();
+  }
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.json(localStore.gallery);
+});
+
+app.post("/api/gallery", async (req, res) => {
+  try {
+    const { 
+      title, 
+      caption, 
+      description, 
+      category, 
+      categoryLabel, 
+      location, 
+      date, 
+      filename, 
+      data, 
+      src,
+      uploaded_by
+    } = req.body;
+    let finalSrc = src || "";
+
+    // If actual photo base64 data provided, write it directly to disk in public/images
+    if (data && typeof data === "string" && data.startsWith("data:image/")) {
+      try {
+        const mimeMatch = data.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,/);
+        let ext = "jpeg";
+        if (mimeMatch && mimeMatch[1]) {
+          ext = mimeMatch[1].toLowerCase();
+          if (ext === "jpg") ext = "jpeg";
+        }
+        
+        const timestamp = Date.now();
+        const rawName = filename 
+          ? filename.replace(/\.[^/.]+$/, "") 
+          : `photo-${timestamp}`;
+        const cleanBase = rawName.replace(/[^a-zA-Z0-9_-]/g, "_");
+        const safeFilename = `${cleanBase}_${timestamp}.${ext}`;
+        
+        const imagesDir = path.join(process.cwd(), "public", "images");
+        if (!fs.existsSync(imagesDir)) {
+          fs.mkdirSync(imagesDir, { recursive: true });
+        }
+
+        const base64Data = data.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
+        const targetPath = path.join(imagesDir, safeFilename);
+        fs.writeFileSync(targetPath, buffer);
+        finalSrc = `/images/${safeFilename}`;
+        console.log(`[Gallery] Saved raw actual photo to ${safeFilename} (${buffer.length} bytes)`);
+      } catch (fileErr) {
+        console.warn("[Gallery] Could not write to disk, using data URL:", fileErr);
+        finalSrc = data;
+      }
+    }
+
+    // Determine admin/uploader identity
+    const userId = req.headers["x-user-id"] as string;
+    const member = localStore.members.find(m => m.id === userId);
+    const uploaderName = uploaded_by || (member ? `${member.name} (${member.title || member.role})` : "Executive Administrator");
+
+    const newPhoto = {
+      id: `photo-${Date.now()}`,
+      filename: filename || "Actual-Community-Photo.jpeg",
+      src: finalSrc || "/images/Price1.jpeg",
+      title: title || caption || "Community Documentary Photo",
+      caption: caption || "Mifuong'o Raruoch community photograph.",
+      description: description || caption || "Actual documentary photograph capturing community initiatives.",
+      category: category || "welfare",
+      categoryLabel: categoryLabel || "Community Welfare",
+      date: date || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      location: location || "North Kadem, Kenya",
+      badgeColor: "bg-emerald-600 text-white",
+      uploaded_by: uploaderName,
+      created_at: new Date().toISOString()
+    };
+
+    localStore.gallery.unshift(newPhoto);
+    saveGalleryStore(localStore.gallery);
+    console.log(`[Gallery] Photo saved and sustained. Total in archive: ${localStore.gallery.length}`);
+    res.status(201).json(newPhoto);
+  } catch (err: any) {
+    console.error("[Gallery] Error saving photo:", err);
+    res.status(500).json({ error: "Failed to save photo", message: err.message });
+  }
+});
+
+app.delete("/api/gallery/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const photoIndex = localStore.gallery.findIndex(p => p.id === id);
+    if (photoIndex === -1) {
+      return res.status(404).json({ error: "Photo not found in archive" });
+    }
+
+    const photoToDelete = localStore.gallery[photoIndex];
+
+    // If it's an uploaded file in public/images/ (not the base price1-4 photos), clean it up from disk
+    if (photoToDelete.src && photoToDelete.src.startsWith("/images/")) {
+      const filename = path.basename(photoToDelete.src);
+      const isBaseImage = /^(price[1-4]\.jpe?g)$/i.test(filename);
+      if (!isBaseImage) {
+        const filePath = path.join(process.cwd(), "public", "images", filename);
+        if (fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+            console.log(`[Gallery] Deleted file from disk: ${filename}`);
+          } catch (fileErr) {
+            console.warn(`[Gallery] Error unlinking ${filename}:`, fileErr);
+          }
+        }
+      }
+    }
+
+    localStore.gallery.splice(photoIndex, 1);
+    saveGalleryStore(localStore.gallery);
+    console.log(`[Gallery] Admin deleted photo ${id}. Remaining: ${localStore.gallery.length}`);
+    res.json({ success: true, id, message: "Photograph deleted from community archive" });
+  } catch (err: any) {
+    console.error("[Gallery] Error deleting photo:", err);
+    res.status(500).json({ error: "Failed to delete photo", message: err.message });
+  }
 });
 
 // Vite middleware for development

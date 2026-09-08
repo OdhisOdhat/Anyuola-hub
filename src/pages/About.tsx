@@ -411,7 +411,7 @@ export default function About() {
           >
             <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
               <img 
-                src="/images/bursary-issuance.jpg" 
+                src="/images/Price1.jpeg" 
                 alt="The leadership issuing bursary cheques to needy students"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
@@ -439,7 +439,7 @@ export default function About() {
           >
             <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
               <img 
-                src="/images/leadership-consultation.jpg" 
+                src="/images/price2.jpeg" 
                 alt="The leadership consulting with civil leaders on development matters"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
@@ -465,7 +465,7 @@ export default function About() {
         <div className="bg-emerald-50/50 rounded-3xl p-6 sm:p-8 border border-emerald-100 flex flex-col md:flex-row items-center gap-6">
           <div className="w-full md:w-52 h-36 rounded-2xl overflow-hidden shrink-0 border border-emerald-200 shadow-sm">
             <img 
-              src="/images/committee-vetting.jpg" 
+              src="/images/price3.jpeg" 
               alt="Bursary Committee Vetting Applications"
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
@@ -618,8 +618,8 @@ export default function About() {
             <div className="absolute -inset-4 bg-rose-100 rounded-[2.5rem] rotate-3 group-hover:rotate-1 transition-transform" />
             <div className="relative aspect-[4/5] rounded-[2rem] overflow-hidden border-4 border-white shadow-xl">
               <img 
-                src="/images/african-children-donate.jpg" 
-                alt="African Children Supported by Education Bursary" 
+                src="/images/price4.jpeg" 
+                alt="Mifuong'o Raruoch Community Welfare Assembly & Bursary Disbursement" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />

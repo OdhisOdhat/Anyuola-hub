@@ -393,8 +393,8 @@ export default function Contribute() {
           <div className="bg-blue-600 rounded-3xl overflow-hidden text-white relative group shadow-xl">
             <div className="relative h-44 w-full overflow-hidden">
               <img 
-                src="/images/african-children-donate.jpg" 
-                alt="African Children Supported by Education Bursary"
+                src="/images/price4.jpeg" 
+                alt="Mifuong'o Raruoch Community Welfare Assembly & Bursary Disbursement"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
               />

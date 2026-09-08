@@ -270,7 +270,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
             <div className="aspect-[16/10] overflow-hidden bg-zinc-100 relative">
               <img 
-                src="/images/bursary-issuance.jpg" 
+                src="/images/Price1.jpeg" 
                 alt="The leadership issuing bursary cheques to needy students"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
@@ -292,7 +292,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
             <div className="aspect-[16/10] overflow-hidden bg-zinc-100 relative">
               <img 
-                src="/images/leadership-consultation.jpg" 
+                src="/images/price2.jpeg" 
                 alt="The leadership consulting with civil leaders on development matters"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
