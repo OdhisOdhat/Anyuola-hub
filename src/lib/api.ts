@@ -1,4 +1,9 @@
 import { supabase } from "./supabase";
+import { 
+  fetchActiveGalleryPhotos, 
+  deleteActivePhoto, 
+  resetArchiveToDefaults 
+} from "./galleryStore";
 
 export const API_BASE = "/api";
 
@@ -66,7 +71,7 @@ async function getHeaders(): Promise<{ [key: string]: string }> {
   return headerPromise;
 }
 
-async function handleResponse(res: Response) {
+export async function handleResponse(res: Response) {
   if (!res.ok) {
     const text = await res.text();
     console.warn(`API responded with ${res.status}:`, text);
@@ -84,7 +89,7 @@ export const DEFAULT_CLAN = {
   name: "MIFUONG'O RARUOCH ORGANIZATION",
   tagline: "Self-Help Group (S.H.G) Reg. 2019 • Kadem Kanyuor",
   description: "Mifuong'o Raruoch is a community organization formed to improve the socioeconomic and geopolitical wellbeing of the people as well as support the vulnerable and the needy population through promoting unity of purpose and pooling of resources for mutual aid.",
-  logo_url: "/images/Price1.jpeg",
+  logo_url: null,
   primary_color: "#10b981",
   secondary_color: "#064e3b",
   website_url: ""
@@ -671,32 +676,7 @@ export async function markMessageRead(id: string) {
  */
 
 export async function fetchGalleryPhotos() {
-  try {
-    const res = await fetch(`${API_BASE}/gallery`, {
-      headers: { "Content-Type": "application/json" }
-    });
-    const data = await handleResponse(res);
-    if (Array.isArray(data) && data.length > 0) {
-      return data;
-    }
-  } catch (err) {
-    console.warn("fetchGalleryPhotos API call error, trying static fallback:", err);
-  }
-
-  // Resilient fallback to static /gallery.json for visitors
-  try {
-    const staticRes = await fetch("/gallery.json");
-    if (staticRes.ok) {
-      const staticData = await staticRes.json();
-      if (Array.isArray(staticData) && staticData.length > 0) {
-        return staticData;
-      }
-    }
-  } catch (staticErr) {
-    console.warn("Static gallery.json fallback failed:", staticErr);
-  }
-
-  return [];
+  return await fetchActiveGalleryPhotos();
 }
 
 export async function uploadGalleryPhoto(photoData: any) {
@@ -714,24 +694,10 @@ export async function uploadGalleryPhoto(photoData: any) {
   return handleResponse(res);
 }
 
-export async function deleteGalleryPhoto(id: string) {
-  let headers: Record<string, string> = { "Content-Type": "application/json" };
-  try {
-    headers = await getHeaders();
-  } catch (err) {
-    console.warn("Failed to get auth headers for delete, using fallback:", err);
-  }
-  const res = await fetch(`${API_BASE}/gallery/${id}`, {
-    method: "DELETE",
-    headers,
-  });
-  return handleResponse(res);
+export async function deleteGalleryPhoto(id: string, src?: string, filename?: string) {
+  return await deleteActivePhoto({ id, src, filename });
 }
 
 export async function resetGalleryPhotos() {
-  const res = await fetch(`${API_BASE}/gallery/reset`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" }
-  });
-  return handleResponse(res);
+  return await resetArchiveToDefaults();
 }

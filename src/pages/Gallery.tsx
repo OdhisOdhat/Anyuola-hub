@@ -26,82 +26,11 @@ import {
   RotateCcw
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { fetchGalleryPhotos, uploadGalleryPhoto, deleteGalleryPhoto, resetGalleryPhotos } from "../lib/api";
+import { uploadGalleryPhoto, deleteGalleryPhoto, resetGalleryPhotos } from "../lib/api";
+import { GalleryPhoto, DEFAULT_GALLERY_PHOTOS, useGalleryPhotos } from "../lib/galleryStore";
 
-export interface GalleryPhoto {
-  id: string;
-  filename: string;
-  src: string;
-  title: string;
-  caption: string;
-  description: string;
-  category: "bursary" | "consultation" | "committee" | "welfare" | "community";
-  categoryLabel: string;
-  date: string;
-  location: string;
-  badgeColor: string;
-  uploaded_by?: string;
-  created_at?: string;
-}
-
-const DEFAULT_PHOTOS: GalleryPhoto[] = [
-  {
-    id: "photo-1",
-    filename: "Price1.jpeg",
-    src: "/images/Price1.jpeg",
-    title: "Bursary Cheques Issuance",
-    caption: "The leadership issuing bursary cheques to needy students.",
-    description: "Executive leaders and the Education Committee of Mifuong'o Raruoch Organization formally distributing scholarship bursary cheques to bright, needy students in North Kadem.",
-    category: "bursary",
-    categoryLabel: "Education Bursaries",
-    date: "Annual Academic Award",
-    location: "North Kadem Community Synod Hall",
-    badgeColor: "bg-emerald-500 text-white",
-    uploaded_by: "Fred Abich (Chairman)"
-  },
-  {
-    id: "photo-2",
-    filename: "price2.jpeg",
-    src: "/images/price2.jpeg",
-    title: "Civil Leadership Consultation",
-    caption: "The leadership consulting with civil leaders on development matters.",
-    description: "Mifuong'o Raruoch elders and executive leadership convening an outdoor consultative strategic synod with regional civil stakeholders to discuss sustainable development priorities.",
-    category: "consultation",
-    categoryLabel: "Civil Consultations",
-    date: "Leadership Synod",
-    location: "Green Garden Pavilion, North Kadem",
-    badgeColor: "bg-blue-600 text-white",
-    uploaded_by: "Fred Abich (Chairman)"
-  },
-  {
-    id: "photo-3",
-    filename: "price3.jpeg",
-    src: "/images/price3.jpeg",
-    title: "Committee Vetting & Due Diligence",
-    caption: "The committee actively vetting bursary applications and verifying needy students.",
-    description: "Working session of committee secretaries, advisors, and leadership examining student bursary application registers and evaluating urgent welfare assistance requests.",
-    category: "committee",
-    categoryLabel: "Governance & Vetting",
-    date: "Committee Working Session",
-    location: "Executive Secretariat Desk",
-    badgeColor: "bg-purple-600 text-white",
-    uploaded_by: "Philip Opiyo Odero (Secretary)"
-  },
-  {
-    id: "photo-4",
-    filename: "price4.jpeg",
-    src: "/images/price4.jpeg",
-    title: "Community Welfare Assembly",
-    caption: "Community welfare assembly and bursary disbursement ceremony.",
-    description: "Mifuong'o Raruoch community gathering in North Kadem bringing together parents, elders, and beneficiaries during the mutual aid distribution ceremony.",
-    category: "welfare",
-    categoryLabel: "Welfare & Assembly",
-    date: "General Assembly",
-    location: "Community Assembly Hall",
-    badgeColor: "bg-amber-600 text-white",
-    uploaded_by: "Paul Aran Onditi (Treasurer)"
-  }
-];
+export type { GalleryPhoto };
+const DEFAULT_PHOTOS = DEFAULT_GALLERY_PHOTOS;
 
 export default function Gallery() {
   const { user } = useAuth();
@@ -143,8 +72,7 @@ export default function Gallery() {
     ))
   );
 
-  const [photos, setPhotos] = useState<GalleryPhoto[]>(DEFAULT_PHOTOS);
-  const [isLoading, setIsLoading] = useState(false);
+  const { photos, isLoading, reload } = useGalleryPhotos();
   const [isUploading, setIsUploading] = useState(false);
 
   // Deletion state
@@ -172,27 +100,6 @@ export default function Gallery() {
     { id: "committee", label: "Governance & Vetting" },
     { id: "welfare", label: "Welfare & Assembly" }
   ];
-
-  // Load photos from server on mount
-  useEffect(() => {
-    async function loadArchives() {
-      setIsLoading(true);
-      try {
-        const serverPhotos = await fetchGalleryPhotos();
-        if (serverPhotos && serverPhotos.length > 0) {
-          setPhotos(serverPhotos);
-        } else {
-          setPhotos(DEFAULT_PHOTOS);
-        }
-      } catch (err) {
-        console.warn("Could not load gallery archives from server:", err);
-        setPhotos(DEFAULT_PHOTOS);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadArchives();
-  }, []);
 
   const filteredPhotos = useMemo(() => {
     return photos.filter((p) => {
@@ -271,35 +178,20 @@ export default function Gallery() {
     try {
       const saved = await uploadGalleryPhoto(photoPayload);
       if (saved && saved.id) {
-        setPhotos(prev => [saved, ...prev]);
         setFeedbackMessage({
           type: "success",
           text: "Photograph uploaded and sustained in server storage. It is now live for all visitors."
         });
         setTimeout(() => setFeedbackMessage(null), 5000);
+        reload();
       } else {
         throw new Error("Invalid response from server");
       }
     } catch (err) {
-      console.warn("Server save error, falling back to local memory:", err);
-      const fallbackPhoto: GalleryPhoto = {
-        id: `custom-${Date.now()}`,
-        filename: uploadedFilename || "Uploaded-Photo.jpg",
-        src: previewUrl,
-        title: photoPayload.title,
-        caption: photoPayload.caption,
-        description: photoPayload.description,
-        category: newCategory,
-        categoryLabel,
-        date: dateFormatted,
-        location: photoPayload.location,
-        badgeColor: "bg-emerald-600 text-white",
-        uploaded_by: photoPayload.uploaded_by
-      };
-      setPhotos(prev => [fallbackPhoto, ...prev]);
+      console.warn("Server save error:", err);
       setFeedbackMessage({
-        type: "success",
-        text: "Photograph saved to active gallery."
+        type: "error",
+        text: "Could not upload photograph. Please check the file and try again."
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
     } finally {
@@ -318,11 +210,7 @@ export default function Gallery() {
     setIsDeleting(true);
     const target = photoToDelete;
     try {
-      const res = await deleteGalleryPhoto(target.id);
-      if (res && res.error) {
-        console.warn("Delete API returned status:", res.error);
-      }
-      setPhotos(prev => prev.filter(p => String(p.id) !== String(target.id)));
+      await deleteGalleryPhoto(target.id, target.src, target.filename);
       if (activePhotoIndex !== null && filteredPhotos[activePhotoIndex]?.id === target.id) {
         setActivePhotoIndex(null);
       }
@@ -332,16 +220,16 @@ export default function Gallery() {
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
       setPhotoToDelete(null);
+      reload();
     } catch (err: any) {
       console.error("Delete photo error:", err);
-      // Remove from view state so UI responds immediately
-      setPhotos(prev => prev.filter(p => String(p.id) !== String(target.id)));
       setFeedbackMessage({
         type: "success",
         text: `Photograph "${target.caption || target.title}" was removed from the gallery view.`
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
       setPhotoToDelete(null);
+      reload();
     } finally {
       setIsDeleting(false);
     }
@@ -352,14 +240,14 @@ export default function Gallery() {
     if (!window.confirm("Restore default archive photographs of Mifuong'o Raruoch?")) return;
     try {
       await resetGalleryPhotos();
-      setPhotos(DEFAULT_PHOTOS);
+      reload();
       setFeedbackMessage({
         type: "success",
         text: "Default community photo archive has been restored."
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
     } catch (err) {
-      setPhotos(DEFAULT_PHOTOS);
+      reload();
       setFeedbackMessage({
         type: "success",
         text: "Default community photo archive restored in view."

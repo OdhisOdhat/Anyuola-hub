@@ -17,12 +17,15 @@ import { fetchEvents, createContribution } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../lib/utils";
+import { useGalleryPhotos, isPhotoDeleted } from "../lib/galleryStore";
 
 export default function Contribute() {
   const [searchParams] = useSearchParams();
   const initialEventId = searchParams.get("event_id") || "";
   const isGuest = searchParams.get("guest") === "true";
   
+  const { photos } = useGalleryPhotos();
+  const welfarePhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-4" || p.category === "welfare"));
   const [events, setEvents] = useState<any[]>([]);
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -391,19 +394,21 @@ export default function Contribute() {
           </div>
 
           <div className="bg-blue-600 rounded-3xl overflow-hidden text-white relative group shadow-xl">
-            <div className="relative h-44 w-full overflow-hidden">
-              <img 
-                src="/images/price4.jpeg" 
-                alt="Mifuong'o Raruoch Community Welfare Assembly & Bursary Disbursement"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/40 to-transparent flex items-end p-4">
-                <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 backdrop-blur-md px-2.5 py-1 rounded-full text-white border border-white/20">
-                  200+ Students Sponsored Yearly
-                </span>
+            {welfarePhoto && !isPhotoDeleted(welfarePhoto) && (
+              <div className="relative h-44 w-full overflow-hidden">
+                <img 
+                  src={welfarePhoto.src} 
+                  alt={welfarePhoto.caption || "Mifuong'o Raruoch Community Welfare Assembly & Bursary Disbursement"}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/40 to-transparent flex items-end p-4">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 backdrop-blur-md px-2.5 py-1 rounded-full text-white border border-white/20">
+                    200+ Students Sponsored Yearly
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
             <div className="p-8 relative space-y-4">
               <Heart className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 -rotate-12 transition-transform group-hover:scale-110" />
               <div className="relative space-y-2">

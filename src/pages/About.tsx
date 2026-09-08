@@ -17,11 +17,12 @@ import {
   X, 
   BookOpen, 
   Landmark, 
-  Search,
-  Sparkles,
-  ChevronRight,
-  Camera
+  Search, 
+  Sparkles, 
+  ChevronRight, 
+  Camera 
 } from "lucide-react";
+import { useGalleryPhotos, isPhotoDeleted } from "../lib/galleryStore";
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -38,8 +39,14 @@ const staggerContainer = {
 };
 
 export default function About() {
+  const { photos } = useGalleryPhotos();
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [lineageFilter, setLineageFilter] = useState("");
+
+  const bursaryPhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-1" || p.category === "bursary"));
+  const consultationPhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-2" || p.category === "consultation"));
+  const vettingPhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-3" || p.category === "committee"));
+  const welfarePhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-4" || p.category === "welfare"));
 
   const foundingLeaders = [
     { name: "Fred Abich", role: "Chairman", title: "Founding Chair" },
@@ -409,13 +416,21 @@ export default function About() {
             whileHover={{ y: -4 }}
             className="bg-white rounded-3xl overflow-hidden border border-zinc-200 shadow-lg hover:shadow-xl transition-all flex flex-col justify-between"
           >
-            <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
-              <img 
-                src="/images/Price1.jpeg" 
-                alt="The leadership issuing bursary cheques to needy students"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+            <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100 flex items-center justify-center">
+              {bursaryPhoto && !isPhotoDeleted(bursaryPhoto) ? (
+                <img 
+                  src={bursaryPhoto.src} 
+                  alt={bursaryPhoto.caption || "The leadership issuing bursary cheques to needy students"}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-emerald-900 to-zinc-950 flex flex-col items-center justify-center p-8 text-center text-white">
+                  <GraduationCap className="w-16 h-16 text-emerald-400 mb-3" />
+                  <span className="text-xs font-black uppercase tracking-widest text-emerald-300">Education Bursary Initiative</span>
+                  <p className="text-xs text-zinc-400 mt-1 max-w-xs">Direct financial aid disbursements for underprivileged students</p>
+                </div>
+              )}
               <div className="absolute top-4 left-4">
                 <span className="px-3.5 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-white/10">
                   Education Committee
@@ -437,13 +452,21 @@ export default function About() {
             whileHover={{ y: -4 }}
             className="bg-white rounded-3xl overflow-hidden border border-zinc-200 shadow-lg hover:shadow-xl transition-all flex flex-col justify-between"
           >
-            <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
-              <img 
-                src="/images/price2.jpeg" 
-                alt="The leadership consulting with civil leaders on development matters"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+            <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100 flex items-center justify-center">
+              {consultationPhoto && !isPhotoDeleted(consultationPhoto) ? (
+                <img 
+                  src={consultationPhoto.src} 
+                  alt={consultationPhoto.caption || "The leadership consulting with civil leaders on development matters"}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-900 to-zinc-950 flex flex-col items-center justify-center p-8 text-center text-white">
+                  <Users className="w-16 h-16 text-blue-400 mb-3" />
+                  <span className="text-xs font-black uppercase tracking-widest text-blue-300">Civil Stakeholder Synod</span>
+                  <p className="text-xs text-zinc-400 mt-1 max-w-xs">Consultative sessions on community infrastructure & regional progress</p>
+                </div>
+              )}
               <div className="absolute top-4 left-4">
                 <span className="px-3.5 py-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md text-blue-400 text-[10px] font-black uppercase tracking-wider border border-white/10">
                   Civil & Strategic Synod
@@ -463,14 +486,20 @@ export default function About() {
 
         {/* Due Diligence & Application Vetting Banner */}
         <div className="bg-emerald-50/50 rounded-3xl p-6 sm:p-8 border border-emerald-100 flex flex-col md:flex-row items-center gap-6">
-          <div className="w-full md:w-52 h-36 rounded-2xl overflow-hidden shrink-0 border border-emerald-200 shadow-sm">
-            <img 
-              src="/images/price3.jpeg" 
-              alt="Bursary Committee Vetting Applications"
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          </div>
+          {vettingPhoto && !isPhotoDeleted(vettingPhoto) ? (
+            <div className="w-full md:w-52 h-36 rounded-2xl overflow-hidden shrink-0 border border-emerald-200 shadow-sm">
+              <img 
+                src={vettingPhoto.src} 
+                alt={vettingPhoto.caption || "Bursary Committee Vetting Applications"}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          ) : (
+            <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
+              <Shield className="w-7 h-7" />
+            </div>
+          )}
           <div className="space-y-2 text-left">
             <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-md">
               Integrity & Verification
@@ -616,13 +645,20 @@ export default function About() {
 
           <div className="relative group">
             <div className="absolute -inset-4 bg-rose-100 rounded-[2.5rem] rotate-3 group-hover:rotate-1 transition-transform" />
-            <div className="relative aspect-[4/5] rounded-[2rem] overflow-hidden border-4 border-white shadow-xl">
-              <img 
-                src="/images/price4.jpeg" 
-                alt="Mifuong'o Raruoch Community Welfare Assembly & Bursary Disbursement" 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+            <div className="relative aspect-[4/5] rounded-[2rem] overflow-hidden border-4 border-white shadow-xl bg-zinc-900 flex flex-col justify-end">
+              {welfarePhoto && !isPhotoDeleted(welfarePhoto) ? (
+                <img 
+                  src={welfarePhoto.src} 
+                  alt={welfarePhoto.caption || "Mifuong'o Raruoch Community Welfare Assembly & Bursary Disbursement"} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-rose-900 via-rose-950 to-zinc-950 flex flex-col items-center justify-center p-8 text-center">
+                  <Gift className="w-20 h-20 text-rose-400 mb-4" />
+                  <span className="text-sm font-black uppercase tracking-widest text-rose-200">Community Welfare Fund</span>
+                </div>
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent flex flex-col justify-end p-6">
                 <span className="text-[10px] font-black uppercase tracking-widest text-rose-300">Scholarship & Education Fund</span>
                 <p className="text-white font-bold text-sm mt-1">Directly empowering underprivileged African children in North Kadem with secondary & tertiary education bursaries.</p>

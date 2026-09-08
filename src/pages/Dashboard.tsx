@@ -16,9 +16,11 @@ import { uploadBrandLogo, updateClanBranding } from "../lib/supabase";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
+import { useGalleryPhotos, isPhotoDeleted } from "../lib/galleryStore";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { photos } = useGalleryPhotos();
   const [clan, setClan] = useState<any>(null);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -124,7 +126,7 @@ export default function Dashboard() {
             {clan?.tagline || "Self-Help Group (S.H.G) Reg. 2019 • Kadem Kanyuor"}
           </motion.div>
           <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4 flex items-center gap-4">
-            {clan?.logo_url && (
+            {clan?.logo_url && !isPhotoDeleted(clan.logo_url) && (
               <img src={clan.logo_url} className="w-12 h-12 object-contain" alt="Logo" />
             )}
             Welcome to {clan?.name || "MIFUONG'O RARUOCH ORGANIZATION"}
@@ -176,7 +178,7 @@ export default function Dashboard() {
                 </h3>
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-zinc-100 rounded-xl flex items-center justify-center border overflow-hidden">
-                    {clan?.logo_url ? <img src={clan.logo_url} className="w-full h-full object-contain" /> : <Users />}
+                    {clan?.logo_url && !isPhotoDeleted(clan.logo_url) ? <img src={clan.logo_url} className="w-full h-full object-contain" /> : <Users />}
                   </div>
                   <input 
                     type="file" 
@@ -267,14 +269,25 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Bursary Cheques Card */}
           <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
-            <div className="aspect-[16/10] overflow-hidden bg-zinc-100 relative">
-              <img 
-                src="/images/Price1.jpeg" 
-                alt="The leadership issuing bursary cheques to needy students"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
+            <div className="aspect-[16/10] overflow-hidden bg-zinc-100 relative flex items-center justify-center">
+              {(() => {
+                const bursaryPhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-1" || p.category === "bursary"));
+                return bursaryPhoto && !isPhotoDeleted(bursaryPhoto) ? (
+                  <img 
+                    src={bursaryPhoto.src} 
+                    alt={bursaryPhoto.caption || "The leadership issuing bursary cheques to needy students"}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-emerald-900 to-zinc-950 flex flex-col items-center justify-center p-6 text-center text-white">
+                    <Users className="w-12 h-12 text-emerald-400 mb-2" />
+                    <span className="text-xs font-black uppercase tracking-widest text-emerald-300">Education Bursary</span>
+                  </div>
+                );
+              })()}
               <span className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-zinc-950/80 text-emerald-400 text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">
                 Education Bursary
               </span>
@@ -289,14 +302,25 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Civil Consultations Card */}
           <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
-            <div className="aspect-[16/10] overflow-hidden bg-zinc-100 relative">
-              <img 
-                src="/images/price2.jpeg" 
-                alt="The leadership consulting with civil leaders on development matters"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
+            <div className="aspect-[16/10] overflow-hidden bg-zinc-100 relative flex items-center justify-center">
+              {(() => {
+                const consultationPhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-2" || p.category === "consultation"));
+                return consultationPhoto && !isPhotoDeleted(consultationPhoto) ? (
+                  <img 
+                    src={consultationPhoto.src} 
+                    alt={consultationPhoto.caption || "The leadership consulting with civil leaders on development matters"}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-blue-900 to-zinc-950 flex flex-col items-center justify-center p-6 text-center text-white">
+                    <Users className="w-12 h-12 text-blue-400 mb-2" />
+                    <span className="text-xs font-black uppercase tracking-widest text-blue-300">Civil Deliberations</span>
+                  </div>
+                );
+              })()}
               <span className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-zinc-950/80 text-blue-400 text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">
                 Civil Deliberations
               </span>

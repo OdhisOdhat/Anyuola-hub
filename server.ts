@@ -52,13 +52,14 @@ const localStore: {
   blogs: any[];
   ads: any[];
   gallery: any[];
+  deletedPhotos: any[];
 } = {
   clan: {
     id: "clan-1",
     name: "MIFUONG'O RARUOCH ORGANIZATION",
     tagline: "Self-Help Group (S.H.G) Reg. 2019 • Kadem Kanyuor",
     description: "Mifuong'o Raruoch is a community organization formed to improve the socioeconomic and geopolitical wellbeing of the people as well as support the vulnerable and the needy population through promoting unity of purpose and pooling of resources for mutual aid.",
-    logo_url: "/images/Price1.jpeg",
+    logo_url: null,
     primary_color: "#10b981",
     secondary_color: "#064e3b",
     website_url: ""
@@ -312,11 +313,13 @@ const localStore: {
   pages: [] as any[],
   blogs: [] as any[],
   ads: [] as any[],
-  gallery: [] as any[]
+  gallery: [] as any[],
+  deletedPhotos: [] as any[]
 };
 
 // Persistent Gallery File Setup
 const GALLERY_STORAGE_FILE = path.join(process.cwd(), "public", "gallery.json");
+const DELETED_STORAGE_FILE = path.join(process.cwd(), "public", "deleted_photos.json");
 
 const DEFAULT_GALLERY_PHOTOS = [
   {
@@ -377,29 +380,88 @@ const DEFAULT_GALLERY_PHOTOS = [
   }
 ];
 
-function loadGalleryStore(): any[] {
+function normalizePhotoName(str?: string): string {
+  if (!str) return "";
+  return str.split("?")[0].replace(/^.*[\\/]/, "").toLowerCase().trim();
+}
+
+function loadDeletedStore(): any[] {
   try {
-    if (fs.existsSync(GALLERY_STORAGE_FILE)) {
-      const raw = fs.readFileSync(GALLERY_STORAGE_FILE, "utf-8");
+    if (fs.existsSync(DELETED_STORAGE_FILE)) {
+      const raw = fs.readFileSync(DELETED_STORAGE_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (err) {
-    console.warn("[Gallery] Error reading gallery.json, initializing defaults:", err);
+    console.warn("[Gallery] Error reading deleted_photos.json:", err);
   }
-  // Initialize default file if not found or corrupted
+  return [];
+}
+
+function saveDeletedStore(deleted: any[]) {
+  try {
+    const dir = path.dirname(DELETED_STORAGE_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(DELETED_STORAGE_FILE, JSON.stringify(deleted, null, 2), "utf-8");
+    const distDeletedFile = path.join(process.cwd(), "dist", "deleted_photos.json");
+    if (fs.existsSync(path.dirname(distDeletedFile))) {
+      try {
+        fs.writeFileSync(distDeletedFile, JSON.stringify(deleted, null, 2), "utf-8");
+      } catch (distErr) {}
+    }
+  } catch (err) {
+    console.error("[Gallery] Failed to write deleted_photos.json:", err);
+  }
+}
+
+function isPhotoDeletedInServer(photo: any, deletedRecords: any[]): boolean {
+  if (!photo || !deletedRecords || deletedRecords.length === 0) return false;
+  const photoId = String(photo.id || "");
+  const photoSrc = String(photo.src || "");
+  const photoName = normalizePhotoName(photo.filename || photo.src);
+  const normalizedSrc = normalizePhotoName(photoSrc);
+
+  return deletedRecords.some((r: any) => {
+    if (r.id && String(r.id) === photoId) return true;
+    if (r.src && photoSrc && r.src === photoSrc) return true;
+    if (r.filename && photoName && normalizePhotoName(r.filename) === photoName) return true;
+    if (r.src && normalizedSrc && normalizePhotoName(r.src) === normalizedSrc) return true;
+    return false;
+  });
+}
+
+function loadGalleryStore(): any[] {
+  const deletedRecords = loadDeletedStore();
+  localStore.deletedPhotos = deletedRecords;
+  try {
+    if (fs.existsSync(GALLERY_STORAGE_FILE)) {
+      const raw = fs.readFileSync(GALLERY_STORAGE_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        // Return parsed without any deleted photos
+        return parsed.filter(p => !isPhotoDeletedInServer(p, deletedRecords));
+      }
+    }
+  } catch (err) {
+    console.warn("[Gallery] Error reading gallery.json:", err);
+  }
+  
+  // If file doesn't exist, only seed defaults that are NOT deleted
+  const filteredDefaults = DEFAULT_GALLERY_PHOTOS.filter(p => !isPhotoDeletedInServer(p, deletedRecords));
   try {
     const dir = path.dirname(GALLERY_STORAGE_FILE);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(GALLERY_STORAGE_FILE, JSON.stringify(DEFAULT_GALLERY_PHOTOS, null, 2), "utf-8");
+    fs.writeFileSync(GALLERY_STORAGE_FILE, JSON.stringify(filteredDefaults, null, 2), "utf-8");
   } catch (writeErr) {
     console.warn("[Gallery] Could not create initial gallery.json:", writeErr);
   }
-  return [...DEFAULT_GALLERY_PHOTOS];
+  return filteredDefaults;
 }
 
 function saveGalleryStore(photos: any[]) {
@@ -425,6 +487,7 @@ function saveGalleryStore(photos: any[]) {
 }
 
 // Populate local store on startup
+localStore.deletedPhotos = loadDeletedStore();
 localStore.gallery = loadGalleryStore();
 
 // Helper: check if Supabase is alive without throwing
@@ -1109,11 +1172,22 @@ app.patch("/api/messages/:id/read", async (req, res) => {
 
 // --- Photo Gallery & Direct Raw Photo Upload ---
 app.get("/api/gallery", async (req, res) => {
-  if (!localStore.gallery || localStore.gallery.length === 0) {
+  const deletedRecords = loadDeletedStore();
+  localStore.deletedPhotos = deletedRecords;
+  if (!localStore.gallery) {
     localStore.gallery = loadGalleryStore();
   }
+  const cleanGallery = (localStore.gallery || []).filter(p => !isPhotoDeletedInServer(p, deletedRecords));
+  localStore.gallery = cleanGallery;
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.json(localStore.gallery);
+  res.json(cleanGallery);
+});
+
+app.get("/api/gallery/deleted", async (req, res) => {
+  const deletedRecords = loadDeletedStore();
+  localStore.deletedPhotos = deletedRecords;
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.json(deletedRecords);
 });
 
 app.post("/api/gallery", async (req, res) => {
@@ -1175,7 +1249,7 @@ app.post("/api/gallery", async (req, res) => {
     const newPhoto = {
       id: `photo-${Date.now()}`,
       filename: filename || "Actual-Community-Photo.jpeg",
-      src: finalSrc || "/images/Price1.jpeg",
+      src: finalSrc || "",
       title: title || caption || "Community Documentary Photo",
       caption: caption || "Mifuong'o Raruoch community photograph.",
       description: description || caption || "Actual documentary photograph capturing community initiatives.",
@@ -1188,6 +1262,9 @@ app.post("/api/gallery", async (req, res) => {
       created_at: new Date().toISOString()
     };
 
+    if (!localStore.gallery) {
+      localStore.gallery = loadGalleryStore();
+    }
     localStore.gallery.unshift(newPhoto);
     saveGalleryStore(localStore.gallery);
     console.log(`[Gallery] Photo saved and sustained. Total in archive: ${localStore.gallery.length}`);
@@ -1201,25 +1278,49 @@ app.post("/api/gallery", async (req, res) => {
 app.delete("/api/gallery/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    if (!localStore.gallery || localStore.gallery.length === 0) {
+    const deletedRecords = loadDeletedStore();
+    localStore.deletedPhotos = deletedRecords;
+
+    if (!localStore.gallery) {
       localStore.gallery = loadGalleryStore();
     }
 
-    let photoIndex = localStore.gallery.findIndex(p => String(p.id) === String(id));
-    if (photoIndex === -1) {
-      // Re-read file just in case it was modified
-      localStore.gallery = loadGalleryStore();
-      photoIndex = localStore.gallery.findIndex(p => String(p.id) === String(id));
+    const targetId = String(id);
+    let photoIndex = localStore.gallery.findIndex(p => 
+      String(p.id) === targetId || 
+      normalizePhotoName(p.filename) === normalizePhotoName(targetId) ||
+      p.src === targetId
+    );
+
+    let photoToDelete = photoIndex !== -1 ? localStore.gallery[photoIndex] : null;
+
+    // Record into permanent deleted registry
+    const recordToAdd = {
+      id: targetId,
+      src: photoToDelete ? photoToDelete.src : (targetId.startsWith("/") ? targetId : ""),
+      filename: photoToDelete ? photoToDelete.filename : normalizePhotoName(targetId),
+      deleted_at: new Date().toISOString()
+    };
+
+    const alreadyMarked = deletedRecords.some(r => 
+      r.id === targetId || 
+      (recordToAdd.filename && normalizePhotoName(r.filename) === recordToAdd.filename) ||
+      (recordToAdd.src && r.src === recordToAdd.src)
+    );
+
+    if (!alreadyMarked) {
+      deletedRecords.push(recordToAdd);
+      saveDeletedStore(deletedRecords);
+      localStore.deletedPhotos = deletedRecords;
     }
 
-    if (photoIndex === -1) {
-      return res.status(404).json({ error: "Photo not found in archive" });
+    if (photoIndex !== -1) {
+      localStore.gallery.splice(photoIndex, 1);
+      saveGalleryStore(localStore.gallery);
     }
 
-    const photoToDelete = localStore.gallery[photoIndex];
-
-    // If it's an uploaded file in public/images/ (not the base price1-4 photos), clean it up from disk
-    if (photoToDelete.src && photoToDelete.src.includes("/images/")) {
+    // If it's an uploaded file in public/images/, clean it up from disk
+    if (photoToDelete && photoToDelete.src && photoToDelete.src.includes("/images/")) {
       const filename = path.basename(photoToDelete.src);
       const isBaseImage = /^(price[1-4]\.jpe?g)$/i.test(filename);
       if (!isBaseImage) {
@@ -1243,10 +1344,8 @@ app.delete("/api/gallery/:id", async (req, res) => {
       }
     }
 
-    localStore.gallery.splice(photoIndex, 1);
-    saveGalleryStore(localStore.gallery);
-    console.log(`[Gallery] Successfully deleted photo ${id}. Remaining: ${localStore.gallery.length}`);
-    res.json({ success: true, id, message: "Photograph deleted from community archive" });
+    console.log(`[Gallery] Successfully recorded permanent deletion for photo ${targetId}. Remaining in archive: ${localStore.gallery.length}`);
+    res.json({ success: true, id: targetId, message: "Photograph permanently deleted from community archive" });
   } catch (err: any) {
     console.error("[Gallery] Error deleting photo:", err);
     res.status(500).json({ error: "Failed to delete photo", message: err.message });
@@ -1256,6 +1355,8 @@ app.delete("/api/gallery/:id", async (req, res) => {
 // Restore default archive photos
 app.post("/api/gallery/reset", async (req, res) => {
   try {
+    localStore.deletedPhotos = [];
+    saveDeletedStore([]);
     localStore.gallery = [...DEFAULT_GALLERY_PHOTOS];
     saveGalleryStore(localStore.gallery);
     res.json({ success: true, message: "Restored default archive photos", gallery: localStore.gallery });
