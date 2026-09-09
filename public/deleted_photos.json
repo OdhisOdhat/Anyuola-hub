@@ -1,12 +1,5 @@
 [
   {
-    "id": "photo-1",
-    "filename": "Price1.jpeg",
-    "src": "/images/Price1.jpeg",
-    "deleted_at": "2026-09-09T01:23:33.000Z",
-    "reason": "Purged stock sample photograph"
-  },
-  {
     "id": "photo-2",
     "filename": "price2.jpeg",
     "src": "/images/price2.jpeg",

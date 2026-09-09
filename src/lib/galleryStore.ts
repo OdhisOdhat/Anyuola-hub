@@ -93,7 +93,29 @@ export interface DeletedPhotoRecord {
 
 // Only actual photographs uploaded by administrators or registered users are maintained in the archive.
 // Stock sample mock photos have been completely removed per administrator directive.
-export const DEFAULT_GALLERY_PHOTOS: GalleryPhoto[] = [];
+export const DEFAULT_GALLERY_PHOTOS: GalleryPhoto[] = [
+  {
+    id: "photo-bursary-ceremony-1",
+    filename: "Price1.jpeg",
+    src: "/images/Price1.jpeg",
+    title: "Bursary Cheques Issuance to Needy Students",
+    caption: "The leadership issuing bursary cheques to needy students in North Kadem.",
+    description: "Mifuong'o Raruoch executive leadership and Education Committee convening in North Kadem to formally issue academic bursaries to vulnerable students and parents, ensuring unhindered school attendance.",
+    category: "bursary",
+    categoryLabel: "Education Committee",
+    date: "Sep 9, 2026",
+    location: "North Kadem, Kenya",
+    badgeColor: "emerald",
+    uploaded_by: "Executive Administration",
+    uploaded_by_user_id: "mem-1",
+    uploaded_by_email: "fodhis1@gmail.com",
+    uploaded_by_role: "admin",
+    is_admin_uploaded: true,
+    created_at: "2026-09-09T08:00:00.000Z",
+    show_on_homepage: true,
+    homepage_section: "bursary"
+  }
+];
 
 const STORAGE_DELETED_KEY = "mifuongo_deleted_photos_registry_v1";
 const STORAGE_ACTIVE_CACHE_KEY = "mifuongo_active_photos_cache_v1";
@@ -112,7 +134,17 @@ export function getDeletedPhotoRecords(): DeletedPhotoRecord[] {
     const raw = localStorage.getItem(STORAGE_DELETED_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Ensure Price1.jpeg is never treated as deleted
+    const filtered = parsed.filter(r => 
+      normalizeName(r.filename) !== "price1.jpeg" && 
+      normalizeName(r.src) !== "price1.jpeg" && 
+      r.id !== "photo-bursary-ceremony-1"
+    );
+    if (filtered.length !== parsed.length) {
+      localStorage.setItem(STORAGE_DELETED_KEY, JSON.stringify(filtered));
+    }
+    return filtered;
   } catch (err) {
     console.warn("Failed to read deleted photo records:", err);
     return [];
@@ -191,11 +223,16 @@ export function isPhotoDeleted(photoOrIdentifier: { id?: string; src?: string; f
       : normalizeName(photoOrIdentifier.src);
   }
 
-  // Stock mock photos are permanently purged from the archive
-  if (/^price[1-4]\.jpe?g$/i.test(testFilename) || /^price[1-4]\.jpe?g$/i.test(normalizeName(testSrc))) {
+  // The official authentic documentary photograph Price1.jpeg is active and protected
+  if (testFilename.toLowerCase() === "price1.jpeg" || normalizeName(testSrc).toLowerCase() === "price1.jpeg" || testId === "photo-bursary-ceremony-1") {
+    return false;
+  }
+
+  // Stock mock sample photos are purged from archive
+  if (/^price[2-4]\.jpe?g$/i.test(testFilename) || /^price[2-4]\.jpe?g$/i.test(normalizeName(testSrc))) {
     return true;
   }
-  if (/^photo-[1-4]$/i.test(testId)) {
+  if (/^photo-[2-4]$/i.test(testId)) {
     return true;
   }
 
@@ -292,9 +329,8 @@ export async function fetchActiveGalleryPhotos(): Promise<GalleryPhoto[]> {
     }
   }
 
-  // 4. If still empty and no photos have ever been deleted, use defaults
-  const deletedRecords = getDeletedPhotoRecords();
-  if (serverList.length === 0 && deletedRecords.length === 0) {
+  // 4. If still empty, use defaults (which includes the official Price1.jpeg bursary photo)
+  if (serverList.length === 0) {
     serverList = [...DEFAULT_GALLERY_PHOTOS];
   }
 

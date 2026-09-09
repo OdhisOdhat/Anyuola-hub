@@ -322,8 +322,30 @@ const GALLERY_STORAGE_FILE = path.join(process.cwd(), "public", "gallery.json");
 const DELETED_STORAGE_FILE = path.join(process.cwd(), "public", "deleted_photos.json");
 
 // Only actual photographs uploaded by administrators or registered users are maintained in the archive.
-// Stock sample mock photos have been completely removed per administrator directive.
-const DEFAULT_GALLERY_PHOTOS: any[] = [];
+// The authentic documentary photograph Price1.jpeg is sustained as an official community archive photo.
+const DEFAULT_GALLERY_PHOTOS: any[] = [
+  {
+    id: "photo-bursary-ceremony-1",
+    filename: "Price1.jpeg",
+    src: "/images/Price1.jpeg",
+    title: "Bursary Cheques Issuance to Needy Students",
+    caption: "The leadership issuing bursary cheques to needy students in North Kadem.",
+    description: "Mifuong'o Raruoch executive leadership and Education Committee convening in North Kadem to formally issue academic bursaries to vulnerable students and parents, ensuring unhindered school attendance.",
+    category: "bursary",
+    categoryLabel: "Education Committee",
+    date: "Sep 9, 2026",
+    location: "North Kadem, Kenya",
+    badgeColor: "emerald",
+    uploaded_by: "Executive Administration",
+    uploaded_by_user_id: "mem-1",
+    uploaded_by_email: "fodhis1@gmail.com",
+    uploaded_by_role: "admin",
+    is_admin_uploaded: true,
+    created_at: "2026-09-09T08:00:00.000Z",
+    show_on_homepage: true,
+    homepage_section: "bursary"
+  }
+];
 
 function normalizePhotoName(str?: string): string {
   if (!str) return "";
@@ -364,11 +386,18 @@ function saveDeletedStore(deleted: any[]) {
 }
 
 function isPhotoDeletedInServer(photo: any, deletedRecords: any[]): boolean {
-  if (!photo || !deletedRecords || deletedRecords.length === 0) return false;
+  if (!photo) return false;
   const photoId = String(photo.id || "");
   const photoSrc = String(photo.src || "");
   const photoName = normalizePhotoName(photo.filename || photo.src);
   const normalizedSrc = normalizePhotoName(photoSrc);
+
+  // Price1.jpeg is the official authentic community photograph requested on the homepage
+  if (photoName.toLowerCase() === "price1.jpeg" || normalizedSrc.toLowerCase() === "price1.jpeg" || photoId === "photo-bursary-ceremony-1") {
+    return false;
+  }
+
+  if (!deletedRecords || deletedRecords.length === 0) return false;
 
   return deletedRecords.some((r: any) => {
     if (r.id && String(r.id) === photoId) return true;
@@ -386,21 +415,24 @@ function loadGalleryStore(): any[] {
     if (fs.existsSync(GALLERY_STORAGE_FILE)) {
       const raw = fs.readFileSync(GALLERY_STORAGE_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        // Only return authenticated photos that are neither deleted nor legacy stock placeholders
-        return parsed.filter(p => {
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Return authenticated photos that are not deleted
+        const active = parsed.filter(p => {
           if (isPhotoDeletedInServer(p, deletedRecords)) return false;
           const name = normalizePhotoName(p.filename || p.src);
-          if (/^price[1-4]\.jpe?g$/i.test(name)) return false;
+          if (/^price[2-4]\.jpe?g$/i.test(name)) return false;
           return true;
         });
+        if (active.length > 0) {
+          return active;
+        }
       }
     }
   } catch (err) {
     console.warn("[Gallery] Error reading gallery.json:", err);
   }
   
-  return [];
+  return [...DEFAULT_GALLERY_PHOTOS];
 }
 
 function saveGalleryStore(photos: any[]) {
@@ -1113,7 +1145,7 @@ app.patch("/api/messages/:id/read", async (req, res) => {
 app.get("/api/gallery", async (req, res) => {
   const deletedRecords = loadDeletedStore();
   localStore.deletedPhotos = deletedRecords;
-  if (!localStore.gallery) {
+  if (!localStore.gallery || localStore.gallery.length === 0) {
     localStore.gallery = loadGalleryStore();
   }
   const cleanGallery = (localStore.gallery || []).filter(p => !isPhotoDeletedInServer(p, deletedRecords));
