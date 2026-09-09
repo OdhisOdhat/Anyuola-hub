@@ -93,29 +93,7 @@ export interface DeletedPhotoRecord {
 
 // Only actual photographs uploaded by administrators or registered users are maintained in the archive.
 // Stock sample mock photos have been completely removed per administrator directive.
-export const DEFAULT_GALLERY_PHOTOS: GalleryPhoto[] = [
-  {
-    id: "photo-bursary-ceremony-1",
-    filename: "Price1.jpeg",
-    src: "/images/Price1.jpeg",
-    title: "Bursary Cheques Issuance to Needy Students",
-    caption: "The leadership issuing bursary cheques to needy students in North Kadem.",
-    description: "Mifuong'o Raruoch executive leadership and Education Committee convening in North Kadem to formally issue academic bursaries to vulnerable students and parents, ensuring unhindered school attendance.",
-    category: "bursary",
-    categoryLabel: "Education Committee",
-    date: "Sep 9, 2026",
-    location: "North Kadem, Kenya",
-    badgeColor: "emerald",
-    uploaded_by: "Executive Administration",
-    uploaded_by_user_id: "mem-1",
-    uploaded_by_email: "fodhis1@gmail.com",
-    uploaded_by_role: "admin",
-    is_admin_uploaded: true,
-    created_at: "2026-09-09T08:00:00.000Z",
-    show_on_homepage: true,
-    homepage_section: "bursary"
-  }
-];
+export const DEFAULT_GALLERY_PHOTOS: GalleryPhoto[] = [];
 
 const STORAGE_DELETED_KEY = "mifuongo_deleted_photos_registry_v1";
 const STORAGE_ACTIVE_CACHE_KEY = "mifuongo_active_photos_cache_v1";
@@ -223,16 +201,11 @@ export function isPhotoDeleted(photoOrIdentifier: { id?: string; src?: string; f
       : normalizeName(photoOrIdentifier.src);
   }
 
-  // The official authentic documentary photograph Price1.jpeg is active and protected
-  if (testFilename.toLowerCase() === "price1.jpeg" || normalizeName(testSrc).toLowerCase() === "price1.jpeg" || testId === "photo-bursary-ceremony-1") {
-    return false;
-  }
-
   // Stock mock sample photos are purged from archive
-  if (/^price[2-4]\.jpe?g$/i.test(testFilename) || /^price[2-4]\.jpe?g$/i.test(normalizeName(testSrc))) {
+  if (/^price[1-4]\.jpe?g$/i.test(testFilename) || /^price[1-4]\.jpe?g$/i.test(normalizeName(testSrc))) {
     return true;
   }
-  if (/^photo-[2-4]$/i.test(testId)) {
+  if (/^photo-[1-4]$/i.test(testId) || testId === "photo-bursary-ceremony-1") {
     return true;
   }
 

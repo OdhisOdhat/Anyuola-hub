@@ -322,30 +322,8 @@ const GALLERY_STORAGE_FILE = path.join(process.cwd(), "public", "gallery.json");
 const DELETED_STORAGE_FILE = path.join(process.cwd(), "public", "deleted_photos.json");
 
 // Only actual photographs uploaded by administrators or registered users are maintained in the archive.
-// The authentic documentary photograph Price1.jpeg is sustained as an official community archive photo.
-const DEFAULT_GALLERY_PHOTOS: any[] = [
-  {
-    id: "photo-bursary-ceremony-1",
-    filename: "Price1.jpeg",
-    src: "/images/Price1.jpeg",
-    title: "Bursary Cheques Issuance to Needy Students",
-    caption: "The leadership issuing bursary cheques to needy students in North Kadem.",
-    description: "Mifuong'o Raruoch executive leadership and Education Committee convening in North Kadem to formally issue academic bursaries to vulnerable students and parents, ensuring unhindered school attendance.",
-    category: "bursary",
-    categoryLabel: "Education Committee",
-    date: "Sep 9, 2026",
-    location: "North Kadem, Kenya",
-    badgeColor: "emerald",
-    uploaded_by: "Executive Administration",
-    uploaded_by_user_id: "mem-1",
-    uploaded_by_email: "fodhis1@gmail.com",
-    uploaded_by_role: "admin",
-    is_admin_uploaded: true,
-    created_at: "2026-09-09T08:00:00.000Z",
-    show_on_homepage: true,
-    homepage_section: "bursary"
-  }
-];
+// Stock sample mock photos have been completely removed per administrator directive.
+const DEFAULT_GALLERY_PHOTOS: any[] = [];
 
 function normalizePhotoName(str?: string): string {
   if (!str) return "";
@@ -392,9 +370,11 @@ function isPhotoDeletedInServer(photo: any, deletedRecords: any[]): boolean {
   const photoName = normalizePhotoName(photo.filename || photo.src);
   const normalizedSrc = normalizePhotoName(photoSrc);
 
-  // Price1.jpeg is the official authentic community photograph requested on the homepage
-  if (photoName.toLowerCase() === "price1.jpeg" || normalizedSrc.toLowerCase() === "price1.jpeg" || photoId === "photo-bursary-ceremony-1") {
-    return false;
+  if (/^price[1-4]\.jpe?g$/i.test(photoName) || /^price[1-4]\.jpe?g$/i.test(normalizedSrc)) {
+    return true;
+  }
+  if (/^photo-[1-4]$/i.test(photoId) || photoId === "photo-bursary-ceremony-1") {
+    return true;
   }
 
   if (!deletedRecords || deletedRecords.length === 0) return false;
@@ -420,7 +400,7 @@ function loadGalleryStore(): any[] {
         const active = parsed.filter(p => {
           if (isPhotoDeletedInServer(p, deletedRecords)) return false;
           const name = normalizePhotoName(p.filename || p.src);
-          if (/^price[2-4]\.jpe?g$/i.test(name)) return false;
+          if (/^price[1-4]\.jpe?g$/i.test(name)) return false;
           return true;
         });
         if (active.length > 0) {
