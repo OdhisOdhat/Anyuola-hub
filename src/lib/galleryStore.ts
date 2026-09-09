@@ -130,9 +130,44 @@ export function getDeletedPhotoRecords(): DeletedPhotoRecord[] {
 }
 
 /**
+ * Merge server deleted records into local storage without triggering recursive broadcast loops
+ */
+export function mergeServerDeletedRecords(serverRecords: DeletedPhotoRecord[]) {
+  try {
+    const current = getDeletedPhotoRecords();
+    let changed = false;
+    for (const record of serverRecords) {
+      if (!record || !record.id) continue;
+      const cleanId = String(record.id);
+      const cleanSrc = record.src || "";
+      const cleanFilename = record.filename || normalizeName(cleanSrc);
+      const exists = current.some(
+        r => r.id === cleanId || 
+             (cleanFilename && normalizeName(r.filename) === normalizeName(cleanFilename)) ||
+             (cleanSrc && r.src === cleanSrc)
+      );
+      if (!exists) {
+        current.push({
+          id: cleanId,
+          src: cleanSrc,
+          filename: cleanFilename,
+          deleted_at: record.deleted_at || new Date().toISOString()
+        });
+        changed = true;
+      }
+    }
+    if (changed) {
+      localStorage.setItem(STORAGE_DELETED_KEY, JSON.stringify(current));
+    }
+  } catch (err) {
+    console.warn("Failed to merge server deleted records:", err);
+  }
+}
+
+/**
  * Record a photo as deleted across its ID, filename, and image URL
  */
-export function markPhotoDeleted(record: { id: string; src?: string; filename?: string }) {
+export function markPhotoDeleted(record: { id: string; src?: string; filename?: string }, broadcast: boolean = false) {
   try {
     const current = getDeletedPhotoRecords();
     const cleanId = String(record.id);
@@ -170,8 +205,8 @@ export function markPhotoDeleted(record: { id: string; src?: string; filename?: 
       // ignore
     }
 
-    // Broadcast change to all pages and tabs
-    if (typeof window !== "undefined") {
+    // Broadcast change only when requested (e.g. active user deletion action)
+    if (broadcast && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("gallery_updated", { detail: { deletedId: cleanId } }));
     }
   } catch (err) {
@@ -246,55 +281,29 @@ export function filterActivePhotos(photos: GalleryPhoto[]): GalleryPhoto[] {
   return photos.filter(photo => !isPhotoDeleted(photo));
 }
 
+let inFlightFetch: Promise<GalleryPhoto[]> | null = null;
+let lastFetchTimestamp = 0;
+const FETCH_COOLDOWN_MS = 2500; // Throttle background fetches to once every 2.5s
+
 /**
  * Fetch active photos from server, syncing server deleted registry and client deleted registry
  */
-export async function fetchActiveGalleryPhotos(): Promise<GalleryPhoto[]> {
-  let serverList: GalleryPhoto[] = [];
+export async function fetchActiveGalleryPhotos(force = false): Promise<GalleryPhoto[]> {
+  const now = Date.now();
 
-  // 1. Fetch server deleted registry first if available
-  try {
-    const delRes = await fetch(`${API_BASE}/gallery/deleted`, {
-      headers: { "Cache-Control": "no-cache" }
-    });
-    if (delRes.ok) {
-      const serverDeleted = await delRes.json();
-      if (Array.isArray(serverDeleted)) {
-        serverDeleted.forEach(record => {
-          if (record && record.id) {
-            markPhotoDeleted(record);
-          }
-        });
-      }
-    }
-  } catch {
-    // Non-blocking
+  // If a fetch is already in flight, return the existing shared promise
+  if (inFlightFetch) {
+    return inFlightFetch;
   }
 
-  // 2. Fetch main gallery from API
-  try {
-    const res = await fetch(`${API_BASE}/gallery`, {
-      headers: { 
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache, no-store, must-revalidate"
-      }
-    });
-    const data = await handleResponse(res);
-    if (Array.isArray(data)) {
-      serverList = data;
-    }
-  } catch (err) {
-    console.warn("[GalleryStore] fetch active photos error, trying cache/static:", err);
-  }
-
-  // 3. If server didn't return an array, check static /gallery.json
-  if (serverList.length === 0) {
+  // If recent fetch occurred and not forced, return cached data to prevent network spamming
+  if (!force && now - lastFetchTimestamp < FETCH_COOLDOWN_MS) {
     try {
-      const staticRes = await fetch("/gallery.json", { cache: "no-store" });
-      if (staticRes.ok) {
-        const staticData = await staticRes.json();
-        if (Array.isArray(staticData)) {
-          serverList = staticData;
+      const cached = localStorage.getItem(STORAGE_ACTIVE_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          return filterActivePhotos(parsed);
         }
       }
     } catch {
@@ -302,22 +311,82 @@ export async function fetchActiveGalleryPhotos(): Promise<GalleryPhoto[]> {
     }
   }
 
-  // 4. If still empty, use defaults (which includes the official Price1.jpeg bursary photo)
-  if (serverList.length === 0) {
-    serverList = [...DEFAULT_GALLERY_PHOTOS];
-  }
+  inFlightFetch = (async () => {
+    let serverList: GalleryPhoto[] = [];
 
-  // 5. CRITICAL: Strictly filter out any photo deleted by admin
-  const activePhotos = filterActivePhotos(serverList);
+    // 1. Fetch server deleted registry first if available
+    try {
+      const delRes = await fetch(`${API_BASE}/gallery/deleted`, {
+        headers: { "Cache-Control": "no-cache" }
+      });
+      const delContentType = delRes.headers.get("content-type") || "";
+      if (delRes.ok && delContentType.includes("json")) {
+        const serverDeleted = await delRes.json();
+        if (Array.isArray(serverDeleted)) {
+          mergeServerDeletedRecords(serverDeleted);
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
 
-  // Cache filtered list
-  try {
-    localStorage.setItem(STORAGE_ACTIVE_CACHE_KEY, JSON.stringify(activePhotos));
-  } catch {
-    // ignore
-  }
+    // 2. Fetch main gallery from API
+    try {
+      const res = await fetch(`${API_BASE}/gallery`, {
+        headers: { 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate"
+        }
+      });
+      const contentType = res.headers.get("content-type") || "";
+      if (res.ok && contentType.includes("json")) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          serverList = data;
+        }
+      }
+    } catch (err) {
+      console.warn("[GalleryStore] fetch active photos error, trying static:", err);
+    }
 
-  return activePhotos;
+    // 3. If server didn't return an array, check static /gallery.json
+    if (serverList.length === 0) {
+      try {
+        const staticRes = await fetch("/gallery.json", { cache: "no-store" });
+        const staticContentType = staticRes.headers.get("content-type") || "";
+        if (staticRes.ok && staticContentType.includes("json")) {
+          const staticData = await staticRes.json();
+          if (Array.isArray(staticData)) {
+            serverList = staticData;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 4. If still empty, use defaults
+    if (serverList.length === 0) {
+      serverList = [...DEFAULT_GALLERY_PHOTOS];
+    }
+
+    // 5. CRITICAL: Strictly filter out any photo deleted by admin
+    const activePhotos = filterActivePhotos(serverList);
+
+    // Cache filtered list quietly
+    try {
+      localStorage.setItem(STORAGE_ACTIVE_CACHE_KEY, JSON.stringify(activePhotos));
+    } catch {
+      // ignore
+    }
+
+    lastFetchTimestamp = Date.now();
+    return activePhotos;
+  })().finally(() => {
+    inFlightFetch = null;
+  });
+
+  return inFlightFetch;
 }
 
 /**
@@ -327,12 +396,12 @@ export async function deleteActivePhoto(
   photo: GalleryPhoto | { id: string; src?: string; filename?: string },
   userContext?: { id?: string; role?: string; email?: string }
 ) {
-  // 1. Mark in client registry immediately so UI responds without delay
+  // 1. Mark in client registry immediately and broadcast to UI
   markPhotoDeleted({
     id: photo.id,
     src: photo.src,
     filename: photo.filename
-  });
+  }, true);
 
   // 2. Call server endpoint with authentication headers
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -392,12 +461,12 @@ export function useGalleryPhotos() {
     }
     return filterActivePhotos(DEFAULT_GALLERY_PHOTOS);
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (force = false) => {
     setIsLoading(true);
     try {
-      const active = await fetchActiveGalleryPhotos();
+      const active = await fetchActiveGalleryPhotos(force);
       setPhotos(active);
     } catch (err) {
       console.warn("Error refreshing gallery photos:", err);
@@ -407,20 +476,24 @@ export function useGalleryPhotos() {
   }, []);
 
   useEffect(() => {
-    reload();
+    reload(false);
 
+    let debounceTimer: any = null;
     const handleUpdate = () => {
-      // Immediately filter current state
+      // Immediately filter existing in-memory photos so deleted photos disappear instantly
       setPhotos(prev => filterActivePhotos(prev));
-      reload();
+      // Debounce the network reload to prevent cascading storms
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        reload(true);
+      }, 400);
     };
 
     window.addEventListener("gallery_updated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
 
     return () => {
+      clearTimeout(debounceTimer);
       window.removeEventListener("gallery_updated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
     };
   }, [reload]);
 
