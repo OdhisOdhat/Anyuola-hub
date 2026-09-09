@@ -698,6 +698,29 @@ export async function uploadGalleryPhoto(photoData: any, userContext?: { id?: st
   return handleResponse(res);
 }
 
+export async function updateGalleryPhoto(
+  id: string, 
+  data: any, 
+  userContext?: { id?: string; role?: string; email?: string }
+) {
+  let headers: Record<string, string> = { "Content-Type": "application/json" };
+  try {
+    headers = await getHeaders();
+  } catch (err) {
+    console.warn("Failed to get auth headers for update, using fallback:", err);
+  }
+  if (userContext?.id) headers["x-user-id"] = userContext.id;
+  if (userContext?.role) headers["x-user-role"] = userContext.role;
+  if (userContext?.email) headers["x-user-email"] = userContext.email;
+
+  const res = await fetch(`${API_BASE}/gallery/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(data),
+  });
+  return handleResponse(res);
+}
+
 export async function deleteGalleryPhoto(id: string, src?: string, filename?: string, userContext?: { id?: string; role?: string; email?: string }) {
   return await deleteActivePhoto({ id, src, filename }, userContext);
 }

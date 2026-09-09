@@ -1146,7 +1146,9 @@ app.post("/api/gallery", async (req, res) => {
       uploaded_by_user_id,
       uploaded_by_email,
       uploaded_by_role,
-      is_admin_uploaded
+      is_admin_uploaded,
+      show_on_homepage,
+      homepage_section
     } = req.body;
     let finalSrc = src || "";
 
@@ -1230,7 +1232,9 @@ app.post("/api/gallery", async (req, res) => {
       uploaded_by_email: effectiveEmail || (isAdmin ? "fodhis1@gmail.com" : ""),
       uploaded_by_role: uploaderRole,
       is_admin_uploaded: isAdmin,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      show_on_homepage: Boolean(isAdmin && show_on_homepage),
+      homepage_section: (isAdmin && show_on_homepage) ? (homepage_section || "featured_carousel") : undefined
     };
 
     if (!localStore.gallery) {
@@ -1238,11 +1242,64 @@ app.post("/api/gallery", async (req, res) => {
     }
     localStore.gallery.unshift(newPhoto);
     saveGalleryStore(localStore.gallery);
-    console.log(`[Gallery] Photo saved and sustained. Total in archive: ${localStore.gallery.length} (Admin: ${isAdmin})`);
+    console.log(`[Gallery] Photo saved and sustained. Total in archive: ${localStore.gallery.length} (Admin: ${isAdmin}, Homepage: ${newPhoto.show_on_homepage ? newPhoto.homepage_section : 'no'})`);
     res.status(201).json(newPhoto);
   } catch (err: any) {
     console.error("[Gallery] Error saving photo:", err);
     res.status(500).json({ error: "Failed to save photo", message: err.message });
+  }
+});
+
+// Update gallery photo metadata / homepage section assignment (Admin only)
+app.patch("/api/gallery/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const headerUserId = req.headers["x-user-id"] as string;
+    const headerUserEmail = req.headers["x-user-email"] as string;
+    const headerUserRole = req.headers["x-user-role"] as string;
+
+    const isAdmin = 
+      headerUserRole === "admin" ||
+      headerUserRole === "treasurer" ||
+      headerUserEmail === "fodhis1@gmail.com" ||
+      headerUserId === "mem-1" ||
+      Boolean(headerUserId && localStore.members.some(m => m.id === headerUserId && (m.role === "admin" || m.role === "treasurer")));
+
+    if (!isAdmin) {
+      return res.status(403).json({ 
+        error: "Forbidden", 
+        message: "Only administrators can assign photographs to homepage sections or modify archive metadata." 
+      });
+    }
+
+    if (!localStore.gallery) {
+      localStore.gallery = loadGalleryStore();
+    }
+
+    const photo = localStore.gallery.find(p => String(p.id) === String(id));
+    if (!photo) {
+      return res.status(404).json({ error: "Photograph not found in archive" });
+    }
+
+    const { show_on_homepage, homepage_section, title, caption, description, category, categoryLabel } = req.body;
+    if (show_on_homepage !== undefined) {
+      photo.show_on_homepage = Boolean(show_on_homepage);
+    }
+    if (homepage_section !== undefined) {
+      photo.homepage_section = homepage_section;
+    }
+    if (title !== undefined) photo.title = title;
+    if (caption !== undefined) photo.caption = caption;
+    if (description !== undefined) photo.description = description;
+    if (category !== undefined) photo.category = category;
+    if (categoryLabel !== undefined) photo.categoryLabel = categoryLabel;
+
+    saveGalleryStore(localStore.gallery);
+    console.log(`[Gallery] Photo ${id} updated by Admin. Homepage: ${photo.show_on_homepage ? photo.homepage_section : 'no'}`);
+    res.json({ success: true, photo });
+  } catch (err: any) {
+    console.error("[Gallery] Error updating photo:", err);
+    res.status(500).json({ error: "Failed to update photo", message: err.message });
   }
 });
 

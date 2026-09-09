@@ -1,6 +1,65 @@
 import { useState, useEffect, useCallback } from "react";
 import { API_BASE, handleResponse } from "./api";
 
+export type HomepageSection = 
+  | "hero" 
+  | "bursary" 
+  | "consultation" 
+  | "vetting" 
+  | "welfare" 
+  | "heritage" 
+  | "featured_carousel" 
+  | "none";
+
+export interface HomepageSectionOption {
+  id: HomepageSection;
+  label: string;
+  description: string;
+}
+
+export const HOMEPAGE_SECTIONS: HomepageSectionOption[] = [
+  { 
+    id: "hero", 
+    label: "Hero Showcase Banner", 
+    description: "Main top banner on the homepage establishing the documentary visual identity." 
+  },
+  { 
+    id: "bursary", 
+    label: "Bursary Cheques Distribution Card", 
+    description: "Featured in the 'Leadership in Action' section illustrating education cheque issuing." 
+  },
+  { 
+    id: "consultation", 
+    label: "Civil & Synod Consultations Card", 
+    description: "Featured in the 'Leadership in Action' section showing executive meetings with civil leaders." 
+  },
+  { 
+    id: "vetting", 
+    label: "Application Vetting & Integrity Banner", 
+    description: "Displayed in the due diligence verification bar for education and welfare." 
+  },
+  { 
+    id: "welfare", 
+    label: "Community Welfare & Well-Wishers Giving", 
+    description: "Showcased in the donation and well-wishers giving fund section." 
+  },
+  { 
+    id: "heritage", 
+    label: "Ancestral Heritage & Descendancy Section", 
+    description: "Showcased alongside the historical heritage and 14 lineage houses." 
+  },
+  { 
+    id: "featured_carousel", 
+    label: "Homepage Highlight Reel", 
+    description: "Featured in the homepage documentary highlights carousel." 
+  },
+  { 
+    id: "none", 
+    label: "Gallery Archive Only", 
+    description: "Accessible in the public photo gallery without homepage placement." 
+  },
+];
+
 export interface GalleryPhoto {
   id: string;
   filename: string;
@@ -19,6 +78,8 @@ export interface GalleryPhoto {
   uploaded_by_role?: string;
   is_admin_uploaded?: boolean;
   created_at?: string;
+  show_on_homepage?: boolean;
+  homepage_section?: HomepageSection;
 }
 
 export interface DeletedPhotoRecord {

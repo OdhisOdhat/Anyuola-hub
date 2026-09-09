@@ -20,9 +20,18 @@ import {
   Search, 
   Sparkles, 
   ChevronRight, 
-  Camera 
+  Camera,
+  Upload,
+  Layers,
+  ShieldCheck,
+  Plus,
+  Check,
+  Trash2,
+  Eye
 } from "lucide-react";
-import { useGalleryPhotos, isPhotoDeleted } from "../lib/galleryStore";
+import { useAuth } from "../contexts/AuthContext";
+import { uploadGalleryPhoto, updateGalleryPhoto } from "../lib/api";
+import { useGalleryPhotos, isPhotoDeleted, HOMEPAGE_SECTIONS, HomepageSection, GalleryPhoto } from "../lib/galleryStore";
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -39,14 +48,141 @@ const staggerContainer = {
 };
 
 export default function About() {
-  const { photos } = useGalleryPhotos();
+  const { user } = useAuth();
+  const { photos, reload } = useGalleryPhotos();
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [lineageFilter, setLineageFilter] = useState("");
 
-  const bursaryPhoto = photos.find(p => !isPhotoDeleted(p) && p.category === "bursary");
-  const consultationPhoto = photos.find(p => !isPhotoDeleted(p) && p.category === "consultation");
-  const vettingPhoto = photos.find(p => !isPhotoDeleted(p) && p.category === "committee");
-  const welfarePhoto = photos.find(p => !isPhotoDeleted(p) && p.category === "welfare");
+  const isAdmin = Boolean(
+    user && (
+      user.role === "admin" ||
+      user.role === "treasurer" ||
+      (user as any).email === "fodhis1@gmail.com" ||
+      user.phone === "0722000001" ||
+      user.id === "mem-1"
+    )
+  );
+
+  // Admin Homepage Media Management state
+  const [isAdminMediaModalOpen, setIsAdminMediaModalOpen] = useState(false);
+  const [adminModalTab, setAdminModalTab] = useState<"upload" | "manage">("upload");
+  const [selectedAdminSection, setSelectedAdminSection] = useState<HomepageSection>("bursary");
+  const [adminCaption, setAdminCaption] = useState("");
+  const [adminTitle, setAdminTitle] = useState("");
+  const [adminLocation, setAdminLocation] = useState("North Kadem, Kenya");
+  const [adminPreviewUrl, setAdminPreviewUrl] = useState<string | null>(null);
+  const [adminFilename, setAdminFilename] = useState("");
+  const [isAdminUploading, setIsAdminUploading] = useState(false);
+  const [adminFeedback, setAdminFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Filter photos by homepage section assignments
+  const heroPhoto = photos.find(p => !isPhotoDeleted(p) && p.homepage_section === "hero");
+  const bursaryPhoto = photos.find(p => !isPhotoDeleted(p) && (p.homepage_section === "bursary" || (!p.homepage_section && p.category === "bursary")));
+  const consultationPhoto = photos.find(p => !isPhotoDeleted(p) && (p.homepage_section === "consultation" || (!p.homepage_section && p.category === "consultation")));
+  const vettingPhoto = photos.find(p => !isPhotoDeleted(p) && (p.homepage_section === "vetting" || (!p.homepage_section && p.category === "committee")));
+  const welfarePhoto = photos.find(p => !isPhotoDeleted(p) && (p.homepage_section === "welfare" || (!p.homepage_section && p.category === "welfare")));
+  const heritagePhoto = photos.find(p => !isPhotoDeleted(p) && p.homepage_section === "heritage");
+  const featuredReelPhotos = photos.filter(p => !isPhotoDeleted(p) && (p.show_on_homepage || p.homepage_section === "featured_carousel"));
+
+  const handleAdminFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAdminFilename(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setAdminPreviewUrl(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAdminUploadToSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminPreviewUrl || !user || !isAdmin) return;
+    setIsAdminUploading(true);
+    const secObj = HOMEPAGE_SECTIONS.find(s => s.id === selectedAdminSection);
+    const categoryForSec: GalleryPhoto["category"] = 
+      selectedAdminSection === "bursary" ? "bursary" :
+      selectedAdminSection === "consultation" ? "consultation" :
+      selectedAdminSection === "vetting" ? "committee" :
+      selectedAdminSection === "welfare" ? "welfare" : "bursary";
+
+    const payload = {
+      title: adminTitle.trim() || adminCaption.trim() || `Homepage ${secObj?.label || 'Photo'}`,
+      caption: adminCaption.trim() || `Official photograph for ${secObj?.label || 'Homepage'}.`,
+      description: adminCaption.trim() || `Administrative upload featured on homepage ${secObj?.label}.`,
+      category: categoryForSec,
+      categoryLabel: secObj?.label || "Community",
+      location: adminLocation.trim() || "North Kadem, Kenya",
+      filename: adminFilename || "Admin-Upload.jpg",
+      data: adminPreviewUrl,
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      uploaded_by: `${user.name} (Admin)`,
+      uploaded_by_user_id: user.id,
+      uploaded_by_email: (user as any).email || "fodhis1@gmail.com",
+      uploaded_by_role: "admin",
+      is_admin_uploaded: true,
+      show_on_homepage: true,
+      homepage_section: selectedAdminSection
+    };
+
+    try {
+      const res = await uploadGalleryPhoto(payload, {
+        id: user.id,
+        role: "admin",
+        email: (user as any).email || "fodhis1@gmail.com"
+      });
+      if (res && res.id) {
+        setAdminFeedback({
+          type: "success",
+          message: `Photograph uploaded and assigned to "${secObj?.label}" section on the Homepage!`
+        });
+        setTimeout(() => setAdminFeedback(null), 4000);
+        setAdminPreviewUrl(null);
+        setAdminCaption("");
+        setAdminTitle("");
+        setAdminFilename("");
+        reload();
+      }
+    } catch (err: any) {
+      setAdminFeedback({
+        type: "error",
+        message: err?.message || "Failed to upload photograph."
+      });
+      setTimeout(() => setAdminFeedback(null), 4000);
+    } finally {
+      setIsAdminUploading(false);
+    }
+  };
+
+  const handleAssignExistingPhoto = async (photoId: string, sectionId: HomepageSection) => {
+    if (!isAdmin) return;
+    try {
+      await updateGalleryPhoto(
+        photoId,
+        {
+          show_on_homepage: sectionId !== "none",
+          homepage_section: sectionId !== "none" ? sectionId : undefined
+        },
+        {
+          id: user?.id,
+          role: "admin",
+          email: (user as any)?.email || "fodhis1@gmail.com"
+        }
+      );
+      setAdminFeedback({
+        type: "success",
+        message: `Updated section placement!`
+      });
+      setTimeout(() => setAdminFeedback(null), 4000);
+      reload();
+    } catch (err: any) {
+      setAdminFeedback({
+        type: "error",
+        message: err?.message || "Failed to update placement."
+      });
+      setTimeout(() => setAdminFeedback(null), 4000);
+    }
+  };
 
   const foundingLeaders = [
     { name: "Fred Abich", role: "Chairman", title: "Founding Chair" },
@@ -139,8 +275,67 @@ export default function About() {
 
   return (
     <div className="space-y-24 pb-20">
+      {/* Executive Admin Homepage Media Banner */}
+      {isAdmin && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-emerald-950 via-zinc-900 to-emerald-950 rounded-3xl p-5 sm:p-6 border border-emerald-500/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                  Admin Homepage Photo Controls
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500 text-zinc-950">
+                  Override Active
+                </span>
+              </div>
+              <p className="text-xs text-emerald-300/80 font-medium">
+                Upload new photos or assign existing gallery photos directly to Hero, Bursary, Synod, Vetting, and Welfare sections.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                setSelectedAdminSection("hero");
+                setIsAdminMediaModalOpen(true);
+              }}
+              className="w-full sm:w-auto px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Upload className="w-4 h-4" />
+              Upload & Assign Section Photo
+            </button>
+            <Link
+              to="/gallery"
+              className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-emerald-300 font-bold rounded-xl text-xs uppercase tracking-wider transition-all border border-zinc-700 whitespace-nowrap"
+            >
+              Full Gallery
+            </Link>
+          </div>
+        </motion.div>
+      )}
+
       {/* Hero Section */}
       <section className="relative overflow-hidden rounded-3xl bg-zinc-950 py-20 px-6 sm:px-12 text-center border border-zinc-800 shadow-2xl">
+        {heroPhoto && !isPhotoDeleted(heroPhoto) && (
+          <div className="absolute inset-0 opacity-20 overflow-hidden pointer-events-none">
+            <img 
+              src={heroPhoto.src} 
+              alt={heroPhoto.caption} 
+              className="w-full h-full object-cover filter blur-[2px] scale-105" 
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/80 via-zinc-950/90 to-zinc-950" />
+          </div>
+        )}
+
         <div className="absolute inset-0 opacity-25">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,#10b981_0,transparent_65%)]" />
         </div>
@@ -436,6 +631,18 @@ export default function About() {
                   Education Committee
                 </span>
               </div>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setSelectedAdminSection("bursary");
+                    setIsAdminMediaModalOpen(true);
+                  }}
+                  className="absolute top-4 right-4 z-20 px-3 py-1.5 rounded-xl bg-zinc-950/80 hover:bg-zinc-950 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider backdrop-blur-md transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Upload className="w-3 h-3 text-emerald-400" />
+                  Admin: Change Photo
+                </button>
+              )}
             </div>
             <div className="p-6 sm:p-8 space-y-3">
               <h3 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-snug">
@@ -472,6 +679,18 @@ export default function About() {
                   Civil & Strategic Synod
                 </span>
               </div>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setSelectedAdminSection("consultation");
+                    setIsAdminMediaModalOpen(true);
+                  }}
+                  className="absolute top-4 right-4 z-20 px-3 py-1.5 rounded-xl bg-zinc-950/80 hover:bg-zinc-950 text-blue-300 border border-blue-500/40 text-[10px] font-black uppercase tracking-wider backdrop-blur-md transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Upload className="w-3 h-3 text-blue-400" />
+                  Admin: Change Photo
+                </button>
+              )}
             </div>
             <div className="p-6 sm:p-8 space-y-3">
               <h3 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-snug">
@@ -485,31 +704,91 @@ export default function About() {
         </div>
 
         {/* Due Diligence & Application Vetting Banner */}
-        <div className="bg-emerald-50/50 rounded-3xl p-6 sm:p-8 border border-emerald-100 flex flex-col md:flex-row items-center gap-6">
-          {vettingPhoto && !isPhotoDeleted(vettingPhoto) ? (
-            <div className="w-full md:w-52 h-36 rounded-2xl overflow-hidden shrink-0 border border-emerald-200 shadow-sm">
-              <img 
-                src={vettingPhoto.src} 
-                alt={vettingPhoto.caption || "Bursary Committee Vetting Applications"}
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+        <div className="bg-emerald-50/50 rounded-3xl p-6 sm:p-8 border border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            {vettingPhoto && !isPhotoDeleted(vettingPhoto) ? (
+              <div className="w-full md:w-52 h-36 rounded-2xl overflow-hidden shrink-0 border border-emerald-200 shadow-sm">
+                <img 
+                  src={vettingPhoto.src} 
+                  alt={vettingPhoto.caption || "Bursary Committee Vetting Applications"}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                <Shield className="w-7 h-7" />
+              </div>
+            )}
+            <div className="space-y-2 text-left">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-md">
+                Integrity & Verification
+              </span>
+              <h4 className="text-lg font-bold text-zinc-900">Rigorous Application Vetting & Welfare Registers</h4>
+              <p className="text-sm text-zinc-600 font-medium leading-relaxed">
+                Every bursary award and welfare disbursement is subjected to transparent review by committee secretaries, technical advisors, and clan representatives to ensure aid reaches the most deserving families.
+              </p>
             </div>
-          ) : (
-            <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
-              <Shield className="w-7 h-7" />
-            </div>
-          )}
-          <div className="space-y-2 text-left">
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-md">
-              Integrity & Verification
-            </span>
-            <h4 className="text-lg font-bold text-zinc-900">Rigorous Application Vetting & Welfare Registers</h4>
-            <p className="text-sm text-zinc-600 font-medium leading-relaxed">
-              Every bursary award and welfare disbursement is subjected to transparent review by committee secretaries, technical advisors, and clan representatives to ensure aid reaches the most deserving families.
-            </p>
           </div>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setSelectedAdminSection("vetting");
+                setIsAdminMediaModalOpen(true);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Admin: Change Photo
+            </button>
+          )}
         </div>
+
+        {/* Featured Visual Highlights Reel */}
+        {featuredReelPhotos.length > 0 && (
+          <div className="space-y-4 pt-4 border-t border-zinc-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                  Visual Archive
+                </span>
+                <h3 className="text-2xl font-black text-zinc-900 tracking-tight mt-1">
+                  Featured Community Highlights Reel
+                </h3>
+              </div>
+              <Link
+                to="/gallery"
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+              >
+                View Full Gallery ({photos.length}) &rarr;
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {featuredReelPhotos.map((p) => (
+                <Link
+                  key={p.id}
+                  to="/gallery"
+                  className="group relative aspect-square rounded-2xl overflow-hidden bg-zinc-100 border border-zinc-200 shadow-sm hover:shadow-md transition-all"
+                >
+                  <img
+                    src={p.src}
+                    alt={p.caption}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2.5 flex flex-col justify-end">
+                    <p className="text-[11px] font-bold text-white line-clamp-2 leading-tight">
+                      {p.caption}
+                    </p>
+                    <span className="text-[9px] text-emerald-300 font-mono mt-0.5">
+                      {p.categoryLabel}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* The 14 Descendancy Lineages Section */}
@@ -658,6 +937,18 @@ export default function About() {
                   <Gift className="w-20 h-20 text-rose-400 mb-4" />
                   <span className="text-sm font-black uppercase tracking-widest text-rose-200">Community Welfare Fund</span>
                 </div>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setSelectedAdminSection("welfare");
+                    setIsAdminMediaModalOpen(true);
+                  }}
+                  className="absolute top-4 right-4 z-20 px-3.5 py-1.5 rounded-xl bg-zinc-950/80 hover:bg-zinc-950 text-rose-300 border border-rose-500/40 text-[10px] font-black uppercase tracking-wider backdrop-blur-md transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Upload className="w-3 h-3 text-rose-400" />
+                  Admin: Change Photo
+                </button>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent flex flex-col justify-end p-6">
                 <span className="text-[10px] font-black uppercase tracking-widest text-rose-300">Scholarship & Education Fund</span>
@@ -809,6 +1100,275 @@ export default function About() {
                   className="w-full px-6 py-4 bg-zinc-900 text-white rounded-xl font-black text-sm text-center hover:bg-black transition-all"
                 >
                   Close Window
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Executive Admin Homepage Media Management Modal */}
+      <AnimatePresence>
+        {isAdmin && isAdminMediaModalOpen && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAdminMediaModalOpen(false)}
+              className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              {/* Header */}
+              <div className="bg-zinc-950 text-white p-5 sm:p-6 flex items-center justify-between border-b border-zinc-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black uppercase tracking-wide text-white">
+                      Homepage Photo Assignment
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Upload or reassign photographs to specific sections on the Homepage
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAdminMediaModalOpen(false)}
+                  className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Feedback toast */}
+              {adminFeedback && (
+                <div
+                  className={`px-5 py-3 text-xs font-bold flex items-center gap-2 ${
+                    adminFeedback.type === "success"
+                      ? "bg-emerald-50 text-emerald-800 border-b border-emerald-200"
+                      : "bg-red-50 text-red-800 border-b border-red-200"
+                  }`}
+                >
+                  {adminFeedback.type === "success" ? (
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <Info className="w-4 h-4 text-red-600 shrink-0" />
+                  )}
+                  <span>{adminFeedback.message}</span>
+                </div>
+              )}
+
+              {/* Tabs */}
+              <div className="flex border-b border-zinc-200 bg-zinc-50 px-5 pt-3 gap-2">
+                <button
+                  onClick={() => setAdminModalTab("upload")}
+                  className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                    adminModalTab === "upload"
+                      ? "bg-white text-zinc-900 border-t border-x border-zinc-200 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-800"
+                  }`}
+                >
+                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                  Upload New Photo
+                </button>
+                <button
+                  onClick={() => setAdminModalTab("manage")}
+                  className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                    adminModalTab === "manage"
+                      ? "bg-white text-zinc-900 border-t border-x border-zinc-200 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-800"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  Gallery Archive ({photos.length})
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
+                {/* Target Section Selection */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black uppercase tracking-wider text-zinc-700 block">
+                    Target Homepage Section
+                  </label>
+                  <select
+                    value={selectedAdminSection}
+                    onChange={(e) => setSelectedAdminSection(e.target.value as HomepageSection)}
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {HOMEPAGE_SECTIONS.filter(s => s.id !== "none").map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label} &mdash; {s.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {adminModalTab === "upload" ? (
+                  <form onSubmit={handleAdminUploadToSection} className="space-y-4">
+                    {/* File Dropzone */}
+                    <div className="border-2 border-dashed border-zinc-300 hover:border-emerald-500 rounded-2xl p-6 text-center transition-all bg-zinc-50 relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAdminFileSelect}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      {adminPreviewUrl ? (
+                        <div className="space-y-3">
+                          <img
+                            src={adminPreviewUrl}
+                            alt="Preview"
+                            className="max-h-48 mx-auto rounded-xl object-contain border border-zinc-200 shadow-sm"
+                          />
+                          <p className="text-xs font-bold text-emerald-700">
+                            {adminFilename} (Click or drag to change)
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
+                            <Upload className="w-6 h-6" />
+                          </div>
+                          <p className="text-xs font-bold text-zinc-800">
+                            Choose or drag photograph to upload
+                          </p>
+                          <p className="text-[11px] text-zinc-500">
+                            Supports JPG, PNG, WEBP (stored in persistent gallery)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-zinc-600 uppercase block mb-1">
+                          Photo Title / Event
+                        </label>
+                        <input
+                          type="text"
+                          value={adminTitle}
+                          onChange={(e) => setAdminTitle(e.target.value)}
+                          placeholder="e.g. Bursary Cheque Issuance 2026"
+                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-zinc-600 uppercase block mb-1">
+                          Location
+                        </label>
+                        <input
+                          type="text"
+                          value={adminLocation}
+                          onChange={(e) => setAdminLocation(e.target.value)}
+                          placeholder="North Kadem, Kenya"
+                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-600 uppercase block mb-1">
+                        Caption / Description
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={adminCaption}
+                        onChange={(e) => setAdminCaption(e.target.value)}
+                        placeholder="Brief documentary caption describing this event or assembly..."
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={!adminPreviewUrl || isAdminUploading}
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {isAdminUploading ? (
+                        <span>Uploading to Section...</span>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Upload & Assign to {HOMEPAGE_SECTIONS.find(s => s.id === selectedAdminSection)?.label}
+                        </>
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-xs text-zinc-500">
+                      Select any existing photo from the gallery archive to immediately assign it to <strong>{HOMEPAGE_SECTIONS.find(s => s.id === selectedAdminSection)?.label}</strong>:
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-1">
+                      {photos.map((p) => {
+                        const isCurrentlyAssigned = p.homepage_section === selectedAdminSection;
+                        return (
+                          <div
+                            key={p.id}
+                            className={`p-3 rounded-2xl border transition-all flex gap-3 items-center ${
+                              isCurrentlyAssigned
+                                ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/20"
+                                : "bg-white border-zinc-200 hover:border-zinc-300"
+                            }`}
+                          >
+                            <img
+                              src={p.src}
+                              alt={p.caption}
+                              className="w-16 h-16 rounded-xl object-cover shrink-0 border border-zinc-200"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <p className="text-xs font-bold text-zinc-900 truncate">
+                                {p.caption || "Community Photo"}
+                              </p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 font-mono">
+                                  {p.categoryLabel}
+                                </span>
+                                {p.homepage_section && (
+                                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                                    {HOMEPAGE_SECTIONS.find(s => s.id === p.homepage_section)?.label || p.homepage_section}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleAssignExistingPhoto(p.id, isCurrentlyAssigned ? "none" : selectedAdminSection)}
+                                className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                  isCurrentlyAssigned
+                                    ? "bg-red-100 hover:bg-red-200 text-red-700"
+                                    : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                                }`}
+                              >
+                                {isCurrentlyAssigned ? "Remove from Section" : "Assign to Section"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="bg-zinc-50 px-5 py-3.5 border-t border-zinc-200 flex items-center justify-between text-xs text-zinc-500">
+                <span>
+                  Active section: <strong>{HOMEPAGE_SECTIONS.find(s => s.id === selectedAdminSection)?.label}</strong>
+                </span>
+                <button
+                  onClick={() => setIsAdminMediaModalOpen(false)}
+                  className="px-4 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  Done
                 </button>
               </div>
             </motion.div>

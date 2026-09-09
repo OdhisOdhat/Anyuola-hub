@@ -23,11 +23,13 @@ import {
   Shield,
   Eye,
   UserCheck,
-  RotateCcw
+  RotateCcw,
+  Sparkles,
+  Layers
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { uploadGalleryPhoto, deleteGalleryPhoto, resetGalleryPhotos } from "../lib/api";
-import { GalleryPhoto, DEFAULT_GALLERY_PHOTOS, useGalleryPhotos } from "../lib/galleryStore";
+import { uploadGalleryPhoto, deleteGalleryPhoto, resetGalleryPhotos, updateGalleryPhoto } from "../lib/api";
+import { GalleryPhoto, DEFAULT_GALLERY_PHOTOS, useGalleryPhotos, HOMEPAGE_SECTIONS, HomepageSection } from "../lib/galleryStore";
 
 export type { GalleryPhoto };
 const DEFAULT_PHOTOS = DEFAULT_GALLERY_PHOTOS;
@@ -91,6 +93,13 @@ export default function Gallery() {
   const [newLocation, setNewLocation] = useState("North Kadem, Kenya");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadedFilename, setUploadedFilename] = useState("");
+  const [newShowOnHomepage, setNewShowOnHomepage] = useState(false);
+  const [newHomepageSection, setNewHomepageSection] = useState<HomepageSection>("bursary");
+
+  // Edit homepage placement state (Admin only)
+  const [editingPlacementPhoto, setEditingPlacementPhoto] = useState<GalleryPhoto | null>(null);
+  const [placementSection, setPlacementSection] = useState<HomepageSection>("bursary");
+  const [isUpdatingPlacement, setIsUpdatingPlacement] = useState(false);
 
   const categories = [
     { id: "all", label: "All Photos" },
@@ -179,7 +188,9 @@ export default function Gallery() {
       uploaded_by_user_id: user.id,
       uploaded_by_email: (user as any).email || (isAdmin ? "fodhis1@gmail.com" : ""),
       uploaded_by_role: isAdmin ? "admin" : (user.role || "member"),
-      is_admin_uploaded: isAdmin
+      is_admin_uploaded: isAdmin,
+      show_on_homepage: Boolean(isAdmin && newShowOnHomepage),
+      homepage_section: (isAdmin && newShowOnHomepage) ? newHomepageSection : undefined
     };
 
     try {
@@ -189,10 +200,13 @@ export default function Gallery() {
         email: (user as any).email || (isAdmin ? "fodhis1@gmail.com" : "")
       });
       if (saved && saved.id) {
+        const homepageNotice = isAdmin && newShowOnHomepage
+          ? ` and featured in the Homepage "${HOMEPAGE_SECTIONS.find(s => s.id === newHomepageSection)?.label}" section!`
+          : ".";
         setFeedbackMessage({
           type: "success",
           text: isAdmin 
-            ? "Photograph uploaded with Executive Admin authority and sustained in the community archive." 
+            ? `Photograph uploaded with Executive Admin authority, sustained in the community archive${homepageNotice}`
             : "Photograph uploaded by registered member and sustained in the archive."
         });
         setTimeout(() => setFeedbackMessage(null), 5000);
@@ -213,7 +227,48 @@ export default function Gallery() {
       setNewCaption("");
       setNewTitle("");
       setUploadedFilename("");
+      setNewShowOnHomepage(false);
       setIsUploadModalOpen(false);
+    }
+  };
+
+  // Save homepage section placement edit (Admin only)
+  const handleSavePlacement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlacementPhoto || !isAdmin) return;
+    setIsUpdatingPlacement(true);
+    try {
+      const isRemoving = placementSection === "none";
+      await updateGalleryPhoto(
+        editingPlacementPhoto.id,
+        {
+          show_on_homepage: !isRemoving,
+          homepage_section: isRemoving ? undefined : placementSection
+        },
+        {
+          id: user?.id,
+          role: "admin",
+          email: (user as any)?.email || "fodhis1@gmail.com"
+        }
+      );
+      setFeedbackMessage({
+        type: "success",
+        text: isRemoving
+          ? `Photograph "${editingPlacementPhoto.title || editingPlacementPhoto.caption}" removed from homepage sections.`
+          : `Photograph assigned to Homepage section: "${HOMEPAGE_SECTIONS.find(s => s.id === placementSection)?.label}".`
+      });
+      setTimeout(() => setFeedbackMessage(null), 5000);
+      setEditingPlacementPhoto(null);
+      reload();
+    } catch (err: any) {
+      console.error("Save placement error:", err);
+      setFeedbackMessage({
+        type: "error",
+        text: err?.message || "Failed to update homepage placement."
+      });
+      setTimeout(() => setFeedbackMessage(null), 5000);
+    } finally {
+      setIsUpdatingPlacement(false);
     }
   };
 
@@ -537,6 +592,12 @@ export default function Gallery() {
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-zinc-900/80 text-zinc-200 backdrop-blur-md">
                     {photo.filename}
                   </span>
+                  {photo.show_on_homepage && (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-zinc-950 backdrop-blur-md shadow-sm flex items-center gap-1">
+                      <Eye className="w-3 h-3" />
+                      Homepage: {HOMEPAGE_SECTIONS.find(s => s.id === photo.homepage_section)?.label.split(" ")[0] || "Featured"}
+                    </span>
+                  )}
                 </div>
 
                 {/* Delete Action Button:
@@ -597,6 +658,29 @@ export default function Gallery() {
                     <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 pt-1">
                       <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <span className="truncate">Sustained by: {photo.uploaded_by}</span>
+                    </div>
+                  )}
+
+                  {isAdmin && (
+                    <div className="pt-2.5 border-t border-zinc-100 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-600" />
+                        Homepage:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingPlacementPhoto(photo);
+                          setPlacementSection(photo.homepage_section || "bursary");
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 border border-emerald-200 cursor-pointer"
+                      >
+                        <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                        {photo.show_on_homepage 
+                          ? `Edit (${HOMEPAGE_SECTIONS.find(s => s.id === photo.homepage_section)?.label.split(" ")[0] || "Section"})` 
+                          : "Assign Section"}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -840,6 +924,55 @@ export default function Gallery() {
                   </div>
                 </div>
 
+                {/* Admin Homepage Placement Controls */}
+                {isAdmin && (
+                  <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-600" />
+                        <span className="text-xs font-black text-emerald-950 uppercase tracking-wider">
+                          Feature on Homepage (Admin)
+                        </span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newShowOnHomepage}
+                          onChange={(e) => setNewShowOnHomepage(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                      </label>
+                    </div>
+
+                    <p className="text-[11px] text-emerald-900/80 font-medium leading-relaxed">
+                      Enable to automatically display this photograph in a dedicated section on the public homepage.
+                    </p>
+
+                    {newShowOnHomepage && (
+                      <div className="space-y-1.5 pt-1">
+                        <label className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider block">
+                          Target Homepage Section
+                        </label>
+                        <select
+                          value={newHomepageSection}
+                          onChange={(e) => setNewHomepageSection(e.target.value as any)}
+                          className="w-full px-3 py-2.5 bg-white border border-emerald-300 rounded-xl text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          {HOMEPAGE_SECTIONS.filter(s => s.id !== "none").map((sec) => (
+                            <option key={sec.id} value={sec.id}>
+                              {sec.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-emerald-800 font-medium italic">
+                          {HOMEPAGE_SECTIONS.find(s => s.id === newHomepageSection)?.description}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="pt-3 flex gap-3">
                   <button
                     type="button"
@@ -861,6 +994,115 @@ export default function Gallery() {
                       </>
                     ) : (
                       "Save Actual Photo"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Homepage Placement Modal (Admin Only) */}
+      <AnimatePresence>
+        {editingPlacementPhoto && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-zinc-950/80 backdrop-blur-md flex items-center justify-center p-4"
+            onClick={() => !isUpdatingPlacement && setEditingPlacementPhoto(null)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 space-y-5 shadow-2xl border border-zinc-200 text-zinc-900"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-zinc-900">
+                      Homepage Section Placement
+                    </h3>
+                    <p className="text-xs text-zinc-500">
+                      Assign or unassign photo from homepage sections
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => !isUpdatingPlacement && setEditingPlacementPhoto(null)}
+                  className="text-zinc-400 hover:text-zinc-600 p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Photo Preview Card */}
+              <div className="bg-zinc-50 rounded-2xl p-3 border border-zinc-200 flex items-center gap-3">
+                <img
+                  src={editingPlacementPhoto.src}
+                  alt={editingPlacementPhoto.caption}
+                  className="w-16 h-16 object-cover rounded-xl border border-zinc-200 shrink-0"
+                />
+                <div className="overflow-hidden space-y-0.5">
+                  <p className="text-xs font-black text-zinc-900 line-clamp-1">
+                    {editingPlacementPhoto.title || editingPlacementPhoto.caption}
+                  </p>
+                  <p className="text-[11px] text-zinc-500 line-clamp-1">
+                    {editingPlacementPhoto.location} • {editingPlacementPhoto.date}
+                  </p>
+                  <p className="text-[10px] text-emerald-700 font-bold">
+                    Current: {editingPlacementPhoto.show_on_homepage 
+                      ? HOMEPAGE_SECTIONS.find(s => s.id === editingPlacementPhoto.homepage_section)?.label || "Featured on Homepage"
+                      : "Gallery Archive Only"}
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSavePlacement} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-700 uppercase tracking-wider block">
+                    Choose Homepage Placement
+                  </label>
+                  <select
+                    value={placementSection}
+                    onChange={(e) => setPlacementSection(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {HOMEPAGE_SECTIONS.map((sec) => (
+                      <option key={sec.id} value={sec.id}>
+                        {sec.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-zinc-500 font-medium leading-relaxed pt-1">
+                    {HOMEPAGE_SECTIONS.find(s => s.id === placementSection)?.description}
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled={isUpdatingPlacement}
+                    onClick={() => setEditingPlacementPhoto(null)}
+                    className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isUpdatingPlacement}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow-md shadow-emerald-600/20 flex items-center gap-2"
+                  >
+                    {isUpdatingPlacement ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      "Apply Placement"
                     )}
                   </button>
                 </div>
