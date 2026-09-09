@@ -321,64 +321,9 @@ const localStore: {
 const GALLERY_STORAGE_FILE = path.join(process.cwd(), "public", "gallery.json");
 const DELETED_STORAGE_FILE = path.join(process.cwd(), "public", "deleted_photos.json");
 
-const DEFAULT_GALLERY_PHOTOS = [
-  {
-    id: "photo-1",
-    filename: "Price1.jpeg",
-    src: "/images/Price1.jpeg",
-    title: "Bursary Cheques Issuance",
-    caption: "The leadership issuing bursary cheques to needy students.",
-    description: "Executive leaders and the Education Committee of Mifuong'o Raruoch Organization formally distributing scholarship bursary cheques to bright, needy students in North Kadem.",
-    category: "bursary",
-    categoryLabel: "Education Bursaries",
-    date: "Annual Academic Award",
-    location: "North Kadem Community Synod Hall",
-    badgeColor: "bg-emerald-500 text-white",
-    uploaded_by: "Fred Abich (Chairman)"
-  },
-  {
-    id: "photo-2",
-    filename: "price2.jpeg",
-    src: "/images/price2.jpeg",
-    title: "Civil Leadership Consultation",
-    caption: "The leadership consulting with civil leaders on development matters.",
-    description: "Mifuong'o Raruoch elders and executive leadership convening an outdoor consultative strategic synod with regional civil stakeholders to discuss sustainable development priorities.",
-    category: "consultation",
-    categoryLabel: "Civil Consultations",
-    date: "Leadership Synod",
-    location: "Green Garden Pavilion, North Kadem",
-    badgeColor: "bg-blue-600 text-white",
-    uploaded_by: "Fred Abich (Chairman)"
-  },
-  {
-    id: "photo-3",
-    filename: "price3.jpeg",
-    src: "/images/price3.jpeg",
-    title: "Committee Vetting & Due Diligence",
-    caption: "The committee actively vetting bursary applications and verifying needy students.",
-    description: "Working session of committee secretaries, advisors, and leadership examining student bursary application registers and evaluating urgent welfare assistance requests.",
-    category: "committee",
-    categoryLabel: "Governance & Vetting",
-    date: "Committee Working Session",
-    location: "Executive Secretariat Desk",
-    badgeColor: "bg-purple-600 text-white",
-    uploaded_by: "Philip Opiyo Odero (Secretary)"
-  },
-  {
-    id: "photo-4",
-    filename: "price4.jpeg",
-    src: "/images/price4.jpeg",
-    title: "Community Welfare Assembly",
-    caption: "Community welfare assembly and bursary disbursement ceremony.",
-    description: "Mifuong'o Raruoch community gathering in North Kadem bringing together parents, elders, and beneficiaries during the mutual aid distribution ceremony.",
-    category: "welfare",
-    categoryLabel: "Welfare & Assembly",
-    date: "General Assembly",
-    location: "Community Assembly Hall",
-    badgeColor: "bg-amber-600 text-white",
-    uploaded_by: "Paul Aran Onditi (Treasurer)"
-  }
-];
+// Only actual photographs uploaded by administrators or registered users are maintained in the archive.
+// Stock sample mock photos have been completely removed per administrator directive.
+const DEFAULT_GALLERY_PHOTOS: any[] = [];
 
 function normalizePhotoName(str?: string): string {
   if (!str) return "";
@@ -442,26 +387,20 @@ function loadGalleryStore(): any[] {
       const raw = fs.readFileSync(GALLERY_STORAGE_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        // Return parsed without any deleted photos
-        return parsed.filter(p => !isPhotoDeletedInServer(p, deletedRecords));
+        // Only return authenticated photos that are neither deleted nor legacy stock placeholders
+        return parsed.filter(p => {
+          if (isPhotoDeletedInServer(p, deletedRecords)) return false;
+          const name = normalizePhotoName(p.filename || p.src);
+          if (/^price[1-4]\.jpe?g$/i.test(name)) return false;
+          return true;
+        });
       }
     }
   } catch (err) {
     console.warn("[Gallery] Error reading gallery.json:", err);
   }
   
-  // If file doesn't exist, only seed defaults that are NOT deleted
-  const filteredDefaults = DEFAULT_GALLERY_PHOTOS.filter(p => !isPhotoDeletedInServer(p, deletedRecords));
-  try {
-    const dir = path.dirname(GALLERY_STORAGE_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(GALLERY_STORAGE_FILE, JSON.stringify(filteredDefaults, null, 2), "utf-8");
-  } catch (writeErr) {
-    console.warn("[Gallery] Could not create initial gallery.json:", writeErr);
-  }
-  return filteredDefaults;
+  return [];
 }
 
 function saveGalleryStore(photos: any[]) {
@@ -1203,9 +1142,39 @@ app.post("/api/gallery", async (req, res) => {
       filename, 
       data, 
       src,
-      uploaded_by
+      uploaded_by,
+      uploaded_by_user_id,
+      uploaded_by_email,
+      uploaded_by_role,
+      is_admin_uploaded
     } = req.body;
     let finalSrc = src || "";
+
+    // Authorization: Only registered users with accounts can upload photos
+    const headerUserId = req.headers["x-user-id"] as string;
+    const headerUserEmail = req.headers["x-user-email"] as string;
+    const headerUserRole = req.headers["x-user-role"] as string;
+
+    const effectiveUserId = headerUserId || uploaded_by_user_id;
+    const effectiveEmail = headerUserEmail || uploaded_by_email;
+    const effectiveRole = headerUserRole || uploaded_by_role;
+
+    const isAdmin = 
+      effectiveRole === "admin" ||
+      effectiveRole === "treasurer" ||
+      effectiveEmail === "fodhis1@gmail.com" ||
+      effectiveUserId === "mem-1" ||
+      Boolean(effectiveUserId && localStore.members.some(m => m.id === effectiveUserId && (m.role === "admin" || m.role === "treasurer")));
+
+    const member = effectiveUserId ? localStore.members.find(m => m.id === effectiveUserId) : null;
+    const isRegistered = Boolean(isAdmin || effectiveUserId || effectiveEmail || member);
+
+    if (!isRegistered) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Only registered users with accounts can upload photographs."
+      });
+    }
 
     // If actual photo base64 data provided, write it directly to disk in public/images
     if (data && typeof data === "string" && data.startsWith("data:image/")) {
@@ -1241,10 +1210,8 @@ app.post("/api/gallery", async (req, res) => {
       }
     }
 
-    // Determine admin/uploader identity
-    const userId = req.headers["x-user-id"] as string;
-    const member = localStore.members.find(m => m.id === userId);
-    const uploaderName = uploaded_by || (member ? `${member.name} (${member.title || member.role})` : "Executive Administrator");
+    const uploaderRole = isAdmin ? "admin" : (effectiveRole || member?.role || "member");
+    const uploaderName = uploaded_by || (member ? `${member.name} (${uploaderRole === 'admin' ? 'Admin' : 'Member'})` : (isAdmin ? "Executive Administrator" : "Registered Member"));
 
     const newPhoto = {
       id: `photo-${Date.now()}`,
@@ -1257,8 +1224,12 @@ app.post("/api/gallery", async (req, res) => {
       categoryLabel: categoryLabel || "Community Welfare",
       date: date || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
       location: location || "North Kadem, Kenya",
-      badgeColor: "bg-emerald-600 text-white",
+      badgeColor: isAdmin ? "bg-emerald-600 text-white" : "bg-blue-600 text-white",
       uploaded_by: uploaderName,
+      uploaded_by_user_id: effectiveUserId || (isAdmin ? "mem-1" : ""),
+      uploaded_by_email: effectiveEmail || (isAdmin ? "fodhis1@gmail.com" : ""),
+      uploaded_by_role: uploaderRole,
+      is_admin_uploaded: isAdmin,
       created_at: new Date().toISOString()
     };
 
@@ -1267,7 +1238,7 @@ app.post("/api/gallery", async (req, res) => {
     }
     localStore.gallery.unshift(newPhoto);
     saveGalleryStore(localStore.gallery);
-    console.log(`[Gallery] Photo saved and sustained. Total in archive: ${localStore.gallery.length}`);
+    console.log(`[Gallery] Photo saved and sustained. Total in archive: ${localStore.gallery.length} (Admin: ${isAdmin})`);
     res.status(201).json(newPhoto);
   } catch (err: any) {
     console.error("[Gallery] Error saving photo:", err);
@@ -1294,11 +1265,61 @@ app.delete("/api/gallery/:id", async (req, res) => {
 
     let photoToDelete = photoIndex !== -1 ? localStore.gallery[photoIndex] : null;
 
+    // Authorization: Only registered users with accounts can delete photos.
+    // Admin overrides all user actions!
+    const headerUserId = req.headers["x-user-id"] as string;
+    const headerUserEmail = req.headers["x-user-email"] as string;
+    const headerUserRole = req.headers["x-user-role"] as string;
+    const bodyUserId = req.body?.user_id || (req.query.user_id as string);
+    const bodyUserEmail = req.body?.user_email || (req.query.user_email as string);
+    const bodyUserRole = req.body?.user_role || (req.query.user_role as string);
+
+    const effectiveUserId = headerUserId || bodyUserId;
+    const effectiveEmail = headerUserEmail || bodyUserEmail;
+    const effectiveRole = headerUserRole || bodyUserRole;
+
+    const isAdmin = 
+      effectiveRole === "admin" ||
+      effectiveRole === "treasurer" ||
+      effectiveEmail === "fodhis1@gmail.com" ||
+      effectiveUserId === "mem-1" ||
+      Boolean(effectiveUserId && localStore.members.some(m => m.id === effectiveUserId && (m.role === "admin" || m.role === "treasurer")));
+
+    const isRegistered = Boolean(isAdmin || effectiveUserId || effectiveEmail || (effectiveUserId && localStore.members.some(m => m.id === effectiveUserId)));
+
+    if (!isRegistered) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Only registered users with accounts can delete photographs."
+      });
+    }
+
+    // If not admin, check ownership: regular users can only delete their own uploads
+    if (!isAdmin && photoToDelete) {
+      if (photoToDelete.is_admin_uploaded || photoToDelete.uploaded_by_role === "admin") {
+        return res.status(403).json({
+          error: "Forbidden",
+          message: "Photographs uploaded by administrators cannot be deleted by standard members. Admin overrides all actions."
+        });
+      }
+      const isOwner = 
+        (photoToDelete.uploaded_by_user_id && photoToDelete.uploaded_by_user_id === effectiveUserId) ||
+        (photoToDelete.uploaded_by_email && photoToDelete.uploaded_by_email === effectiveEmail);
+      if (!isOwner) {
+        return res.status(403).json({
+          error: "Forbidden",
+          message: "You can only delete photographs you uploaded yourself."
+        });
+      }
+    }
+
+    // Admin overrides all user actions: Admin can delete ANY photo!
     // Record into permanent deleted registry
     const recordToAdd = {
       id: targetId,
       src: photoToDelete ? photoToDelete.src : (targetId.startsWith("/") ? targetId : ""),
       filename: photoToDelete ? photoToDelete.filename : normalizePhotoName(targetId),
+      deleted_by: isAdmin ? "Admin (Override)" : (effectiveUserId || "User"),
       deleted_at: new Date().toISOString()
     };
 
@@ -1344,7 +1365,7 @@ app.delete("/api/gallery/:id", async (req, res) => {
       }
     }
 
-    console.log(`[Gallery] Successfully recorded permanent deletion for photo ${targetId}. Remaining in archive: ${localStore.gallery.length}`);
+    console.log(`[Gallery] Successfully deleted photo ${targetId} (Admin override: ${isAdmin}). Remaining in archive: ${localStore.gallery.length}`);
     res.json({ success: true, id: targetId, message: "Photograph permanently deleted from community archive" });
   } catch (err: any) {
     console.error("[Gallery] Error deleting photo:", err);

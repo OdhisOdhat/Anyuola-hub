@@ -43,10 +43,10 @@ export default function About() {
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [lineageFilter, setLineageFilter] = useState("");
 
-  const bursaryPhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-1" || p.category === "bursary"));
-  const consultationPhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-2" || p.category === "consultation"));
-  const vettingPhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-3" || p.category === "committee"));
-  const welfarePhoto = photos.find(p => !isPhotoDeleted(p) && (p.id === "photo-4" || p.category === "welfare"));
+  const bursaryPhoto = photos.find(p => !isPhotoDeleted(p) && p.category === "bursary");
+  const consultationPhoto = photos.find(p => !isPhotoDeleted(p) && p.category === "consultation");
+  const vettingPhoto = photos.find(p => !isPhotoDeleted(p) && p.category === "committee");
+  const welfarePhoto = photos.find(p => !isPhotoDeleted(p) && p.category === "welfare");
 
   const foundingLeaders = [
     { name: "Fred Abich", role: "Chairman", title: "Founding Chair" },

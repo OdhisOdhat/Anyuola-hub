@@ -14,6 +14,10 @@ export interface GalleryPhoto {
   location: string;
   badgeColor: string;
   uploaded_by?: string;
+  uploaded_by_user_id?: string;
+  uploaded_by_email?: string;
+  uploaded_by_role?: string;
+  is_admin_uploaded?: boolean;
   created_at?: string;
 }
 
@@ -21,67 +25,14 @@ export interface DeletedPhotoRecord {
   id: string;
   src?: string;
   filename?: string;
+  deleted_by?: string;
   deleted_at?: string;
+  reason?: string;
 }
 
-export const DEFAULT_GALLERY_PHOTOS: GalleryPhoto[] = [
-  {
-    id: "photo-1",
-    filename: "Price1.jpeg",
-    src: "/images/Price1.jpeg",
-    title: "Bursary Cheques Issuance",
-    caption: "The leadership issuing bursary cheques to needy students.",
-    description: "Executive leaders and the Education Committee of Mifuong'o Raruoch Organization formally distributing scholarship bursary cheques to bright, needy students in North Kadem.",
-    category: "bursary",
-    categoryLabel: "Education Bursaries",
-    date: "Annual Academic Award",
-    location: "North Kadem Community Synod Hall",
-    badgeColor: "bg-emerald-500 text-white",
-    uploaded_by: "Fred Abich (Chairman)"
-  },
-  {
-    id: "photo-2",
-    filename: "price2.jpeg",
-    src: "/images/price2.jpeg",
-    title: "Civil Leadership Consultation",
-    caption: "The leadership consulting with civil leaders on development matters.",
-    description: "Mifuong'o Raruoch elders and executive leadership convening an outdoor consultative strategic synod with regional civil stakeholders to discuss sustainable development priorities.",
-    category: "consultation",
-    categoryLabel: "Civil Consultations",
-    date: "Leadership Synod",
-    location: "Green Garden Pavilion, North Kadem",
-    badgeColor: "bg-blue-600 text-white",
-    uploaded_by: "Fred Abich (Chairman)"
-  },
-  {
-    id: "photo-3",
-    filename: "price3.jpeg",
-    src: "/images/price3.jpeg",
-    title: "Committee Vetting & Due Diligence",
-    caption: "The committee actively vetting bursary applications and verifying needy students.",
-    description: "Working session of committee secretaries, advisors, and leadership examining student bursary application registers and evaluating urgent welfare assistance requests.",
-    category: "committee",
-    categoryLabel: "Governance & Vetting",
-    date: "Committee Working Session",
-    location: "Executive Secretariat Desk",
-    badgeColor: "bg-purple-600 text-white",
-    uploaded_by: "Philip Opiyo Odero (Secretary)"
-  },
-  {
-    id: "photo-4",
-    filename: "price4.jpeg",
-    src: "/images/price4.jpeg",
-    title: "Community Welfare Assembly",
-    caption: "Community welfare assembly and bursary disbursement ceremony.",
-    description: "Mifuong'o Raruoch community gathering in North Kadem bringing together parents, elders, and beneficiaries during the mutual aid distribution ceremony.",
-    category: "welfare",
-    categoryLabel: "Welfare & Assembly",
-    date: "General Assembly",
-    location: "Community Assembly Hall",
-    badgeColor: "bg-amber-600 text-white",
-    uploaded_by: "Paul Aran Onditi (Treasurer)"
-  }
-];
+// Only actual photographs uploaded by administrators or registered users are maintained in the archive.
+// Stock sample mock photos have been completely removed per administrator directive.
+export const DEFAULT_GALLERY_PHOTOS: GalleryPhoto[] = [];
 
 const STORAGE_DELETED_KEY = "mifuongo_deleted_photos_registry_v1";
 const STORAGE_ACTIVE_CACHE_KEY = "mifuongo_active_photos_cache_v1";
@@ -162,8 +113,6 @@ export function markPhotoDeleted(record: { id: string; src?: string; filename?: 
  */
 export function isPhotoDeleted(photoOrIdentifier: { id?: string; src?: string; filename?: string } | string): boolean {
   if (!photoOrIdentifier) return false;
-  const deletedRecords = getDeletedPhotoRecords();
-  if (deletedRecords.length === 0) return false;
 
   let testId = "";
   let testSrc = "";
@@ -180,6 +129,17 @@ export function isPhotoDeleted(photoOrIdentifier: { id?: string; src?: string; f
       ? normalizeName(photoOrIdentifier.filename) 
       : normalizeName(photoOrIdentifier.src);
   }
+
+  // Stock mock photos are permanently purged from the archive
+  if (/^price[1-4]\.jpe?g$/i.test(testFilename) || /^price[1-4]\.jpe?g$/i.test(normalizeName(testSrc))) {
+    return true;
+  }
+  if (/^photo-[1-4]$/i.test(testId)) {
+    return true;
+  }
+
+  const deletedRecords = getDeletedPhotoRecords();
+  if (deletedRecords.length === 0) return false;
 
   const normalizedTestSrc = normalizeName(testSrc);
 
@@ -293,7 +253,10 @@ export async function fetchActiveGalleryPhotos(): Promise<GalleryPhoto[]> {
 /**
  * Perform deletion on server and client
  */
-export async function deleteActivePhoto(photo: GalleryPhoto | { id: string; src?: string; filename?: string }) {
+export async function deleteActivePhoto(
+  photo: GalleryPhoto | { id: string; src?: string; filename?: string },
+  userContext?: { id?: string; role?: string; email?: string }
+) {
   // 1. Mark in client registry immediately so UI responds without delay
   markPhotoDeleted({
     id: photo.id,
@@ -301,11 +264,21 @@ export async function deleteActivePhoto(photo: GalleryPhoto | { id: string; src?
     filename: photo.filename
   });
 
-  // 2. Call server endpoint
+  // 2. Call server endpoint with authentication headers
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (userContext?.id) headers["x-user-id"] = userContext.id;
+  if (userContext?.role) headers["x-user-role"] = userContext.role;
+  if (userContext?.email) headers["x-user-email"] = userContext.email;
+
   try {
     const res = await fetch(`${API_BASE}/gallery/${photo.id}`, {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" }
+      headers,
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        user_role: userContext?.role,
+        user_email: userContext?.email
+      })
     });
     return await handleResponse(res);
   } catch (err) {

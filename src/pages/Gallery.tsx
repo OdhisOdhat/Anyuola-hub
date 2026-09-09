@@ -35,42 +35,32 @@ const DEFAULT_PHOTOS = DEFAULT_GALLERY_PHOTOS;
 export default function Gallery() {
   const { user } = useAuth();
 
-  // Admin Management Mode state (persisted in localStorage, defaults to true so delete controls are immediately accessible in production)
-  const [adminMode, setAdminMode] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem("gallery_admin_mode");
-      if (saved !== null) {
-        return saved === "true";
-      }
-    } catch {
-      // fallback
-    }
-    return true; // Default to true so Delete is readily available in production
-  });
-
-  const toggleAdminMode = () => {
-    setAdminMode(prev => {
-      const next = !prev;
-      try {
-        localStorage.setItem("gallery_admin_mode", String(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  };
-
-  // Admin access check: explicit admin role, treasurer role, designated email, primary admin ID, OR adminMode enabled
+  // Authentication & RBAC status:
+  // "Only registered user with accounts can upload and delete photos. Admin overrides all user actions."
+  const isRegisteredUser = Boolean(user);
   const isAdmin = Boolean(
-    adminMode ||
-    (user && (
+    user && (
       user.role === "admin" ||
       user.role === "treasurer" ||
       (user as any).email === "fodhis1@gmail.com" ||
       user.phone === "0722000001" ||
       user.id === "mem-1"
-    ))
+    )
   );
+
+  // Permission helper:
+  // - Non-registered users CANNOT delete any photo.
+  // - Admin overrides all user actions: Admin can delete ANY photo (both admin and user photos).
+  // - Registered members can ONLY delete photos they uploaded themselves (not admin photos).
+  const canDeletePhoto = (photo: GalleryPhoto): boolean => {
+    if (!user) return false;
+    if (isAdmin) return true; // Admin overrides all user actions!
+    if (photo.is_admin_uploaded || photo.uploaded_by_role === "admin") return false;
+    const isOwner = 
+      (photo.uploaded_by_user_id && photo.uploaded_by_user_id === user.id) ||
+      (photo.uploaded_by_email && (user as any).email && photo.uploaded_by_email === (user as any).email);
+    return Boolean(isOwner);
+  };
 
   const { photos, isLoading, reload } = useGalleryPhotos();
   const [isUploading, setIsUploading] = useState(false);
@@ -84,6 +74,15 @@ export default function Gallery() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const handleOpenUpload = () => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setIsUploadModalOpen(true);
+  };
 
   // New photo upload form state
   const [newCaption, setNewCaption] = useState("");
@@ -157,6 +156,10 @@ export default function Gallery() {
   const handleSaveUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!previewUrl) return;
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
 
     setIsUploading(true);
     const categoryLabel = categories.find(c => c.id === newCategory)?.label || "Community";
@@ -172,26 +175,36 @@ export default function Gallery() {
       filename: uploadedFilename || "Uploaded-Photo.jpg",
       data: previewUrl,
       date: dateFormatted,
-      uploaded_by: user ? `${user.name} (${user.role === 'admin' ? 'Admin' : user.role})` : "Executive Administrator"
+      uploaded_by: `${user.name} (${isAdmin ? 'Admin' : (user.role || 'Member')})`,
+      uploaded_by_user_id: user.id,
+      uploaded_by_email: (user as any).email || (isAdmin ? "fodhis1@gmail.com" : ""),
+      uploaded_by_role: isAdmin ? "admin" : (user.role || "member"),
+      is_admin_uploaded: isAdmin
     };
 
     try {
-      const saved = await uploadGalleryPhoto(photoPayload);
+      const saved = await uploadGalleryPhoto(photoPayload, {
+        id: user.id,
+        role: isAdmin ? "admin" : user.role,
+        email: (user as any).email || (isAdmin ? "fodhis1@gmail.com" : "")
+      });
       if (saved && saved.id) {
         setFeedbackMessage({
           type: "success",
-          text: "Photograph uploaded and sustained in server storage. It is now live for all visitors."
+          text: isAdmin 
+            ? "Photograph uploaded with Executive Admin authority and sustained in the community archive." 
+            : "Photograph uploaded by registered member and sustained in the archive."
         });
         setTimeout(() => setFeedbackMessage(null), 5000);
         reload();
       } else {
         throw new Error("Invalid response from server");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Server save error:", err);
       setFeedbackMessage({
         type: "error",
-        text: "Could not upload photograph. Please check the file and try again."
+        text: err?.message || "Could not upload photograph. Only registered users with accounts can upload."
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
     } finally {
@@ -204,19 +217,31 @@ export default function Gallery() {
     }
   };
 
-  // Admin delete confirmation handler
+  // Delete confirmation handler:
+  // Admin overrides all user actions; registered members can delete their own uploads
   const handleConfirmDelete = async () => {
     if (!photoToDelete) return;
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     setIsDeleting(true);
     const target = photoToDelete;
     try {
-      await deleteGalleryPhoto(target.id, target.src, target.filename);
+      await deleteGalleryPhoto(target.id, target.src, target.filename, {
+        id: user.id,
+        role: isAdmin ? "admin" : user.role,
+        email: (user as any).email || (isAdmin ? "fodhis1@gmail.com" : "")
+      });
       if (activePhotoIndex !== null && filteredPhotos[activePhotoIndex]?.id === target.id) {
         setActivePhotoIndex(null);
       }
+      const isOverride = isAdmin && target.uploaded_by_user_id && target.uploaded_by_user_id !== user.id;
       setFeedbackMessage({
         type: "success",
-        text: `Photograph "${target.caption || target.title}" was permanently removed from the community gallery.`
+        text: isOverride
+          ? `Admin Override: Photograph "${target.caption || target.title}" was permanently deleted by Executive Administrator.`
+          : `Photograph "${target.caption || target.title}" was permanently removed from the community gallery.`
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
       setPhotoToDelete(null);
@@ -224,8 +249,8 @@ export default function Gallery() {
     } catch (err: any) {
       console.error("Delete photo error:", err);
       setFeedbackMessage({
-        type: "success",
-        text: `Photograph "${target.caption || target.title}" was removed from the gallery view.`
+        type: "error",
+        text: err?.message || `Failed to delete photograph "${target.caption || target.title}". Permission denied.`
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
       setPhotoToDelete(null);
@@ -304,12 +329,17 @@ export default function Gallery() {
               {isAdmin ? (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-300 text-amber-900 text-xs font-black uppercase tracking-wider">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                  Admin Controls: Active (fodhis1@gmail.com) • Delete & Upload Enabled
+                  Admin Controls Active: {(user as any)?.email || user?.name || "fodhis1@gmail.com"} • Full Override
+                </div>
+              ) : isRegisteredUser ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-black uppercase tracking-wider">
+                  <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                  Registered Member: {user?.name} ({user?.role || "member"})
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 border border-zinc-200 text-zinc-700 text-xs font-black uppercase tracking-wider">
                   <Eye className="w-3.5 h-3.5 text-zinc-500" />
-                  Visitor View Mode
+                  Visitor Mode • Sign In Required to Upload or Delete
                 </div>
               )}
             </div>
@@ -323,48 +353,33 @@ export default function Gallery() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Admin Management Toggle (Active by default so Delete function is immediately accessible) */}
-            <button
-              onClick={toggleAdminMode}
-              className={`px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 border shadow-sm ${
-                adminMode
-                  ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 shadow-red-500/10"
-                  : "bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200"
-              }`}
-              title={adminMode ? "Admin mode is active: Delete buttons are visible on all photos" : "Click to enable Admin Mode to delete photos"}
-            >
-              {adminMode ? (
-                <>
-                  <ShieldCheck className="w-4 h-4 text-red-600" />
-                  <span>Admin Mode: ON</span>
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                </>
-              ) : (
-                <>
-                  <Shield className="w-4 h-4 text-zinc-500" />
-                  <span>Admin Mode: OFF</span>
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-sm transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Upload Actual Photo
-            </button>
-
-            {photos.length < DEFAULT_PHOTOS.length && (
+            {isAdmin && (
               <button
-                onClick={handleResetArchive}
-                className="px-4 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
-                title="Restore default photographic archive"
+                onClick={() => reload()}
+                className="px-4 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 border border-zinc-200"
+                title="Sync and refresh archive from server"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                Restore Defaults
+                Refresh Archive
               </button>
             )}
+
+            {!isRegisteredUser && (
+              <Link
+                to="/login"
+                className="px-4 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 border border-zinc-200"
+              >
+                Sign In to Contribute
+              </Link>
+            )}
+
+            <button
+              onClick={handleOpenUpload}
+              className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-sm transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              {isAdmin ? "Upload Actual Photo (Admin)" : "Upload Actual Photo"}
+            </button>
           </div>
         </div>
 
@@ -374,18 +389,18 @@ export default function Gallery() {
           <div className="space-y-2 max-w-2xl relative z-10">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-[11px] font-black uppercase tracking-wider border border-emerald-500/30">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              Sustained Community Archives • Real Photographic Captures
+              Sustained Community Archives • Authentic Captures Only
             </div>
             <h2 className="text-xl font-black tracking-tight text-white">
               Raw Documentary Captures from North Kadem
             </h2>
             <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
-              All images uploaded by the executive leadership are permanently sustained and accessible to every visitor. Photos are stored in raw authentic resolution with zero artificial filtering. Administrators have direct authority to upload new event captures and delete obsolete photographs.
+              Default sample mock photos have been cleared. Only registered users with accounts can upload and delete photographs. Executive Administrators hold permanent override authority to delete obsolete or unauthorized entries.
             </p>
           </div>
           <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shrink-0 flex items-center gap-2 relative z-10"
+            onClick={handleOpenUpload}
+            className="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shrink-0 flex items-center gap-2 relative z-10 cursor-pointer"
           >
             <Upload className="w-4 h-4" />
             Add Camera Photo
@@ -437,25 +452,40 @@ export default function Gallery() {
           <div className="w-16 h-16 rounded-full bg-zinc-100 text-zinc-400 flex items-center justify-center mx-auto">
             <ImageIcon className="w-8 h-8" />
           </div>
-          <div className="space-y-1">
-            <h3 className="text-xl font-bold text-zinc-900">No photos found</h3>
-            <p className="text-sm text-zinc-500">Try changing your search query or category filter.</p>
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="text-xl font-bold text-zinc-900">
+              {photos.length === 0 ? "No photos in community archive" : "No matching photos found"}
+            </h3>
+            <p className="text-sm text-zinc-500">
+              {photos.length === 0
+                ? "All default sample photos have been removed per administrative directive. Only authentic documentary captures uploaded by administrators and registered community members will appear here."
+                : "Try changing your search query or category filter."}
+            </p>
           </div>
-          <div className="flex items-center justify-center gap-3">
-            <button
-              onClick={() => { setSelectedCategory("all"); setSearchQuery(""); }}
-              className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-all"
-            >
-              Reset Filters
-            </button>
-            {photos.length === 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {photos.length > 0 && (
               <button
-                onClick={handleResetArchive}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                onClick={() => { setSelectedCategory("all"); setSearchQuery(""); }}
+                className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-all"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Restore Default Archive
+                Reset Filters
               </button>
+            )}
+            {isRegisteredUser ? (
+              <button
+                onClick={handleOpenUpload}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-emerald-600/20"
+              >
+                <Plus className="w-4 h-4" />
+                Upload First Photograph
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-emerald-600/20"
+              >
+                Sign In to Upload Photos
+              </Link>
             )}
           </div>
         </div>
@@ -493,24 +523,49 @@ export default function Gallery() {
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm ${photo.badgeColor}`}>
                     {photo.categoryLabel}
                   </span>
+                  {photo.is_admin_uploaded || photo.uploaded_by_role === "admin" ? (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-700/90 text-white backdrop-blur-md shadow-sm flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" />
+                      Admin Verified
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-700/90 text-white backdrop-blur-md shadow-sm flex items-center gap-1">
+                      <UserCheck className="w-3 h-3" />
+                      Member Upload
+                    </span>
+                  )}
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-zinc-900/80 text-zinc-200 backdrop-blur-md">
                     {photo.filename}
                   </span>
                 </div>
 
-                {/* Admin Delete Action Button */}
-                {isAdmin && (
+                {/* Delete Action Button:
+                    - Registered users can delete their own uploaded photos
+                    - Admin overrides all user actions and can delete ANY photo */}
+                {canDeletePhoto(photo) && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setPhotoToDelete(photo);
                     }}
-                    className="absolute top-4 right-4 z-20 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider shadow-xl backdrop-blur-md flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 border border-red-500 cursor-pointer"
-                    title="Delete photograph from archive"
+                    className={`absolute top-4 right-4 z-20 px-3.5 py-1.5 rounded-xl text-white text-xs font-black uppercase tracking-wider shadow-xl backdrop-blur-md flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 border cursor-pointer ${
+                      isAdmin && photo.uploaded_by_user_id && photo.uploaded_by_user_id !== user?.id
+                        ? "bg-red-700 hover:bg-red-800 border-red-600"
+                        : "bg-red-600 hover:bg-red-700 border-red-500"
+                    }`}
+                    title={
+                      isAdmin && photo.uploaded_by_user_id && photo.uploaded_by_user_id !== user?.id
+                        ? "Admin Override: Permanently delete member photograph from archive"
+                        : "Delete photograph from archive"
+                    }
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
+                    <span>
+                      {isAdmin && photo.uploaded_by_user_id && photo.uploaded_by_user_id !== user?.id
+                        ? "Override Delete"
+                        : "Delete"}
+                    </span>
                   </button>
                 )}
               </div>
@@ -648,15 +703,23 @@ export default function Gallery() {
                 <div className="pt-4 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
                   <span>Photo {activePhotoIndex + 1} of {filteredPhotos.length}</span>
                   <div className="flex items-center gap-3">
-                    {isAdmin && (
+                    {canDeletePhoto(activePhoto) && (
                       <button
                         type="button"
                         onClick={() => setPhotoToDelete(activePhoto)}
                         className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all shadow-md shadow-red-600/30 cursor-pointer border border-red-500"
-                        title="Delete photograph from archive"
+                        title={
+                          isAdmin && activePhoto.uploaded_by_user_id && activePhoto.uploaded_by_user_id !== user?.id
+                            ? "Admin Override: Delete community member photograph from archive"
+                            : "Delete photograph from archive"
+                        }
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete Photo</span>
+                        <span>
+                          {isAdmin && activePhoto.uploaded_by_user_id && activePhoto.uploaded_by_user_id !== user?.id
+                            ? "Override Delete"
+                            : "Delete Photo"}
+                        </span>
                       </button>
                     )}
                     <a
@@ -807,7 +870,7 @@ export default function Gallery() {
         )}
       </AnimatePresence>
 
-      {/* Delete Confirmation Modal for Admin */}
+      {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {photoToDelete && (
           <motion.div
@@ -826,11 +889,22 @@ export default function Gallery() {
                   <AlertTriangle className="w-6 h-6" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-lg font-black text-zinc-900">
-                    Delete Photograph?
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black text-zinc-900">
+                      Delete Photograph?
+                    </h3>
+                    {isAdmin && photoToDelete.uploaded_by_user_id && photoToDelete.uploaded_by_user_id !== user?.id && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider border border-amber-300">
+                        Admin Override
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-zinc-500 leading-relaxed">
-                    This action will permanently delete this photograph from the Mifuong'o Raruoch public archive. Visitors will no longer see this image.
+                    {isAdmin && photoToDelete.uploaded_by_user_id && photoToDelete.uploaded_by_user_id !== user?.id
+                      ? `Executive Admin Authority: Your action overrides standard user privileges and will permanently delete this photograph uploaded by "${photoToDelete.uploaded_by || 'Member'}" from the public community archive.`
+                      : isAdmin
+                      ? "As an Administrator, you are permanently removing this photograph from the community documentary archive."
+                      : "You are deleting a photograph you previously uploaded. This action will permanently remove it from the public archive."}
                   </p>
                 </div>
               </div>
@@ -846,6 +920,9 @@ export default function Gallery() {
                   <p className="text-xs font-black text-zinc-800 line-clamp-1">{photoToDelete.title || photoToDelete.caption}</p>
                   <p className="text-[11px] text-zinc-500 line-clamp-1">{photoToDelete.location} • {photoToDelete.date}</p>
                   <p className="text-[10px] font-mono text-zinc-400 truncate">{photoToDelete.filename}</p>
+                  {photoToDelete.uploaded_by && (
+                    <p className="text-[10px] text-emerald-600 font-medium truncate">By: {photoToDelete.uploaded_by}</p>
+                  )}
                 </div>
               </div>
 
@@ -854,7 +931,7 @@ export default function Gallery() {
                   type="button"
                   disabled={isDeleting}
                   onClick={() => setPhotoToDelete(null)}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors"
+                  className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -862,7 +939,7 @@ export default function Gallery() {
                   type="button"
                   disabled={isDeleting}
                   onClick={handleConfirmDelete}
-                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow-md shadow-red-600/20 flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow-md shadow-red-600/20 flex items-center gap-2 cursor-pointer"
                 >
                   {isDeleting ? (
                     <>
@@ -872,10 +949,80 @@ export default function Gallery() {
                   ) : (
                     <>
                       <Trash2 className="w-3.5 h-3.5" />
-                      Confirm Delete
+                      {isAdmin && photoToDelete.uploaded_by_user_id && photoToDelete.uploaded_by_user_id !== user?.id
+                        ? "Confirm Override Delete"
+                        : "Confirm Delete"}
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Auth Required Modal (when guest tries to upload or delete) */}
+      <AnimatePresence>
+        {isAuthModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-zinc-950/80 backdrop-blur-md flex items-center justify-center p-4"
+            onClick={() => setIsAuthModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 space-y-5 shadow-2xl border border-zinc-200 text-zinc-900"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Account Required
+                  </span>
+                  <h3 className="text-lg font-black text-zinc-900">
+                    Sign In to Contribute
+                  </h3>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    Only registered community members with verified accounts can upload and delete photographs. Executive Administrators override all user actions.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-zinc-50 rounded-2xl p-4 border border-zinc-200 space-y-2.5 text-xs text-zinc-700">
+                <div className="flex items-center gap-2 font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Registered members can upload & delete their own photos</span>
+                </div>
+                <div className="flex items-center gap-2 font-semibold">
+                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Admin overrides all user actions across all archives</span>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors"
+                >
+                  Cancel
+                </button>
+                <Link
+                  to="/login"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-md shadow-emerald-600/20"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition-colors"
+                >
+                  Register
+                </Link>
               </div>
             </div>
           </motion.div>
