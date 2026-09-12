@@ -1,6 +1,6 @@
 {
   "name": "Ka Mifuong'o North Kadem, Nyatike - Mifuong'o Raruoch Organization",
-  "description": "Official portal of Ka Mifuong'o North Kadem, Nyatike — Mifuong'o Raruoch Organization (S.H.G). Uniting 14 lineages in North Kadem, Nyatike Sub-County for education bursaries, welfare aid, and community empowerment.",
+  "description": "Official portal of Mifuong'o (Mifuongo) Raruoch Organization in North Kadem, Nyatike Sub-County, Migori County. Uniting Kadem lineages for education bursaries, welfare aid, and community development with Anyuola Hub (https://anyuola-hub.vercel.app/).",
   "requestFramePermissions": [
     "geolocation"
   ],

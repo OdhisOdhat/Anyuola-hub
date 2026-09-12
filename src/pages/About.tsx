@@ -436,7 +436,7 @@ export default function About() {
           <motion.div variants={fadeIn} className="flex flex-wrap items-center justify-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] border border-emerald-500/25">
               <Sparkles className="w-3 h-3 text-emerald-400" />
-              Ka Mifuong'o North Kadem, Nyatike
+              Mifuongo • Mifuong'o • North Kadem, Nyatike
             </span>
             <span className="px-3 py-1 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-bold uppercase tracking-wider border border-zinc-700">
               Registered Self-Help Group (S.H.G) • Est. 2019
@@ -458,7 +458,7 @@ export default function About() {
             variants={fadeIn}
             className="text-zinc-300 text-base sm:text-lg md:text-xl font-medium max-w-3xl mx-auto leading-relaxed"
           >
-            A community self-help organization rooted in <strong className="text-white font-bold">Ka Mifuong'o North Kadem, Nyatike</strong> Sub-County, established to advance socioeconomic empowerment, provide educational bursaries, and unite the 14 descendancy lineages of <strong className="text-white font-bold">Mifuong'o Raruoch</strong> through pooled mutual aid.
+            A community self-help organization rooted in <strong className="text-white font-bold">Mifuong'o (Mifuongo) North Kadem, Nyatike</strong> Sub-County, established to advance socioeconomic empowerment, provide educational bursaries, and unite all 14 descendancy lineages of <strong className="text-white font-bold">Kadem</strong> through pooled mutual aid and network synergy with <a href="https://anyuola-hub.vercel.app/" target="_blank" rel="noopener" className="text-emerald-400 hover:text-emerald-300 underline font-semibold">Anyuola Hub</a>.
           </motion.p>
           
           <motion.div variants={fadeIn} className="flex flex-wrap justify-center gap-4 pt-4">
@@ -1050,10 +1050,10 @@ export default function About() {
       <section className="bg-zinc-50 rounded-[2.5rem] p-10 sm:p-14 border border-zinc-200">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           <div className="space-y-3">
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Digital Infrastructure</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Digital Infrastructure & Community Network</span>
             <h2 className="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight">Support Our Platform Logistics</h2>
             <p className="text-zinc-600 font-medium max-w-2xl mx-auto leading-relaxed">
-              To keep the Mifuong'o Raruoch digital portal active, secure, and accessible to members across North Kadem and the diaspora, we maintain cloud infrastructure and community database tools.
+              To keep the Mifuong'o (Mifuongo) Raruoch digital portal active, secure, and accessible to members across North Kadem, Nyatike, and the diaspora, we maintain cloud infrastructure in collaboration with our community ecosystem partner, <a href="https://anyuola-hub.vercel.app/" target="_blank" rel="noopener" className="text-emerald-600 hover:text-emerald-700 font-bold underline">Anyuola Hub</a>.
             </p>
           </div>
 
@@ -1069,6 +1069,26 @@ export default function About() {
                 <span className="text-xs text-zinc-400">{item.desc}</span>
               </div>
             ))}
+          </div>
+
+          {/* Anyuola Hub Cross-link & Ranking Signal */}
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+            <div className="space-y-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800">
+                Partner Network • Anyuola Hub
+              </span>
+              <p className="text-xs text-emerald-950 font-medium">
+                Explore the wider Kadem community portal and collaborative resources on Anyuola Hub.
+              </p>
+            </div>
+            <a 
+              href="https://anyuola-hub.vercel.app/" 
+              target="_blank" 
+              rel="noopener"
+              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-sm inline-flex items-center gap-1.5"
+            >
+              Visit Anyuola Hub &nearr;
+            </a>
           </div>
 
           <div className="pt-2">
