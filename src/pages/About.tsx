@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import { 
@@ -20,6 +20,7 @@ import {
   Search, 
   Sparkles, 
   ChevronRight, 
+  ChevronLeft,
   Camera,
   Upload,
   Layers,
@@ -47,11 +48,70 @@ const staggerContainer = {
   }
 };
 
+// Community photographs provided for the hero carousel display
+export const HERO_CAROUSEL_IMAGES = [
+  {
+    id: "hero-img-1",
+    src: "https://i.imgur.com/4gYBtVO.jpeg",
+    title: "Community Elders & Leadership Assembly",
+    caption: "Mifuong'o Raruoch elders and stakeholders convening in North Kadem"
+  },
+  {
+    id: "hero-img-2",
+    src: "https://i.imgur.com/doaMZRI.jpeg",
+    title: "Community Outreach & Dialogue",
+    caption: "Inclusive civic discussion on local welfare, development, and empowerment"
+  },
+  {
+    id: "hero-img-3",
+    src: "https://i.imgur.com/NTSztzV.jpeg",
+    title: "Leadership Consultative Synod",
+    caption: "Executive committee aligning on strategic goals and ancestral lineage unity"
+  },
+  {
+    id: "hero-img-4",
+    src: "https://i.imgur.com/kDkySmL.jpeg",
+    title: "Community Welfare Gathering",
+    caption: "Members in collaborative assembly advancing mutual aid and empowerment"
+  },
+  {
+    id: "hero-img-5",
+    src: "https://i.imgur.com/0QVdWXf.jpeg",
+    title: "General Community Session",
+    caption: "High-level consultative gathering deliberating on North Kadem initiatives"
+  },
+  {
+    id: "hero-img-6",
+    src: "https://i.imgur.com/GPTfeem.jpeg",
+    title: "Education Bursary Initiative",
+    caption: "Formal academic bursary disbursements supporting needy students in North Kadem"
+  }
+];
+
 export default function About() {
   const { user } = useAuth();
   const { photos, reload } = useGalleryPhotos();
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [lineageFilter, setLineageFilter] = useState("");
+
+  // Hero carousel state
+  const [heroSlideIndex, setHeroSlideIndex] = useState(0);
+
+  // Auto-advance hero carousel every 6 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroSlideIndex(prev => (prev + 1) % HERO_CAROUSEL_IMAGES.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const nextHeroSlide = () => {
+    setHeroSlideIndex(prev => (prev + 1) % HERO_CAROUSEL_IMAGES.length);
+  };
+
+  const prevHeroSlide = () => {
+    setHeroSlideIndex(prev => (prev - 1 + HERO_CAROUSEL_IMAGES.length) % HERO_CAROUSEL_IMAGES.length);
+  };
 
   const isAdmin = Boolean(
     user && (
@@ -274,26 +334,61 @@ export default function About() {
 
   return (
     <div className="space-y-24 pb-20">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-zinc-950 py-20 px-6 sm:px-12 text-center border border-zinc-800 shadow-2xl">
-        {heroPhoto && !isPhotoDeleted(heroPhoto) && (
-          <div className="absolute inset-0 opacity-20 overflow-hidden pointer-events-none">
-            <img 
-              src={heroPhoto.src} 
-              alt={heroPhoto.caption} 
-              className="w-full h-full object-cover filter blur-[2px] scale-105" 
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/80 via-zinc-950/90 to-zinc-950" />
-          </div>
-        )}
+      {/* Hero Section - Pure Full-Bleed Photograph Carousel */}
+      <section className="relative overflow-hidden rounded-3xl bg-zinc-950 h-[380px] sm:h-[480px] md:h-[560px] border border-zinc-800 shadow-2xl">
+        {/* Dynamic Hero Photo Carousel Background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={heroSlideIndex}
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8, ease: "easeInOut" }}
+              className="absolute inset-0"
+            >
+              <img 
+                src={HERO_CAROUSEL_IMAGES[heroSlideIndex].src} 
+                alt={HERO_CAROUSEL_IMAGES[heroSlideIndex].title} 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+              />
+            </motion.div>
+          </AnimatePresence>
+          {/* Subtle bottom vignette to frame the pager dots cleanly */}
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-zinc-950/40 pointer-events-none" />
+        </div>
 
-        <div className="absolute inset-0 opacity-25">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,#10b981_0,transparent_65%)]" />
+        {/* Carousel Navigation Arrows */}
+        <div className="absolute top-1/2 -translate-y-1/2 left-3 sm:left-6 z-20">
+          <button
+            onClick={prevHeroSlide}
+            aria-label="Previous Hero Photograph"
+            className="w-11 h-11 rounded-full bg-zinc-900/80 hover:bg-emerald-600/90 text-white border border-zinc-700/80 hover:border-emerald-500/80 flex items-center justify-center transition-all backdrop-blur-md shadow-xl hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="absolute top-1/2 -translate-y-1/2 right-3 sm:right-6 z-20">
+          <button
+            onClick={nextHeroSlide}
+            aria-label="Next Hero Photograph"
+            className="w-11 h-11 rounded-full bg-zinc-900/80 hover:bg-emerald-600/90 text-white border border-zinc-700/80 hover:border-emerald-500/80 flex items-center justify-center transition-all backdrop-blur-md shadow-xl hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Top Floating Carousel Indicator Badge */}
+        <div className="absolute top-4 left-4 sm:left-8 z-20">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/80 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-md">
+            <Camera className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Community Gallery • {heroSlideIndex + 1} of {HERO_CAROUSEL_IMAGES.length}</span>
+          </div>
         </div>
 
         {isAdmin && (
-          <div className="absolute top-4 right-4 z-20">
+          <div className="absolute top-4 right-4 sm:right-8 z-20">
             <button
               onClick={() => {
                 setSelectedAdminSection("hero");
@@ -302,11 +397,35 @@ export default function About() {
               className="px-3.5 py-1.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-900 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider backdrop-blur-md transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
             >
               <Upload className="w-3 h-3 text-emerald-400" />
-              Admin: Hero Photo
+              Admin: Media
             </button>
           </div>
         )}
-        
+
+        {/* Bottom Pager Dots */}
+        <div className="absolute bottom-5 inset-x-0 z-20 flex items-center justify-center gap-2">
+          {HERO_CAROUSEL_IMAGES.map((img, idx) => (
+            <button
+              key={img.id}
+              onClick={() => setHeroSlideIndex(idx)}
+              aria-label={`Go to slide ${idx + 1}`}
+              className={`transition-all rounded-full cursor-pointer ${
+                heroSlideIndex === idx
+                  ? "w-8 h-2.5 bg-emerald-400 shadow-md shadow-emerald-500/50"
+                  : "w-2.5 h-2.5 bg-white/50 hover:bg-white/90"
+              }`}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Relocated Organization Introduction, Mission & Impact Highlights */}
+      <section className="relative overflow-hidden rounded-3xl bg-zinc-950 py-16 px-6 sm:px-12 text-center border border-zinc-800 shadow-xl">
+        {/* Emerald subtle background aura */}
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,#10b981_0,transparent_65%)]" />
+        </div>
+
         <motion.div 
           className="relative z-10 max-w-4xl mx-auto space-y-6"
           initial="initial"

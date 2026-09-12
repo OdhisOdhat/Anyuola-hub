@@ -631,18 +631,9 @@ export default function Gallery() {
                 )}
               </div>
 
-              {/* Caption & Metadata Body */}
-              <div className="p-6 sm:p-7 space-y-4 flex-1 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <h3 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-snug">
-                    {photo.caption}
-                  </h3>
-                  <p className="text-zinc-600 text-sm font-medium leading-relaxed">
-                    {photo.description}
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-zinc-100 space-y-2">
+              {/* Metadata Body (Clean layout without captions) */}
+              <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-end">
+                <div className="space-y-2.5">
                   <div className="flex items-center justify-between text-xs text-zinc-500 font-medium">
                     <div className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -655,7 +646,7 @@ export default function Gallery() {
                   </div>
 
                   {photo.uploaded_by && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 pt-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 pt-0.5">
                       <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <span className="truncate">Sustained by: {photo.uploaded_by}</span>
                     </div>
@@ -754,15 +745,7 @@ export default function Gallery() {
                     </span>
                   </div>
 
-                  <h2 className="text-2xl font-black tracking-tight leading-snug">
-                    {activePhoto.caption}
-                  </h2>
-
-                  <p className="text-zinc-300 text-sm font-medium leading-relaxed">
-                    {activePhoto.description}
-                  </p>
-
-                  <div className="space-y-3 pt-4 border-t border-zinc-800 text-xs text-zinc-400">
+                  <div className="space-y-3 pt-2 text-xs text-zinc-400">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
                       <span>{activePhoto.location}</span>
