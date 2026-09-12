@@ -1075,10 +1075,10 @@ export default function About() {
           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
             <div className="space-y-1">
               <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800">
-                Partner Network • Anyuola Hub
+                Mifuong'o Raruoch Organization Ecosystem • Anyuola Hub
               </span>
               <p className="text-xs text-emerald-950 font-medium">
-                Explore the wider Kadem community portal and collaborative resources on Anyuola Hub.
+                Official community network associating Mifuong'o Raruoch Organization with the wider Kadem portal on Anyuola Hub (https://anyuola-hub.vercel.app/).
               </p>
             </div>
             <a 
@@ -1086,6 +1086,7 @@ export default function About() {
               target="_blank" 
               rel="noopener"
               className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-sm inline-flex items-center gap-1.5"
+              title="Mifuong'o Raruoch Organization on Anyuola Hub"
             >
               Visit Anyuola Hub &nearr;
             </a>
