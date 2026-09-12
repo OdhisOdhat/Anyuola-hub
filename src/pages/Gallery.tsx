@@ -573,33 +573,6 @@ export default function Gallery() {
                   </div>
                 </div>
 
-                {/* Top Badges */}
-                <div className="absolute top-4 left-4 flex flex-wrap gap-2 z-10">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm ${photo.badgeColor}`}>
-                    {photo.categoryLabel}
-                  </span>
-                  {photo.is_admin_uploaded || photo.uploaded_by_role === "admin" ? (
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-700/90 text-white backdrop-blur-md shadow-sm flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" />
-                      Admin Verified
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-700/90 text-white backdrop-blur-md shadow-sm flex items-center gap-1">
-                      <UserCheck className="w-3 h-3" />
-                      Member Upload
-                    </span>
-                  )}
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-zinc-900/80 text-zinc-200 backdrop-blur-md">
-                    {photo.filename}
-                  </span>
-                  {photo.show_on_homepage && (
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-zinc-950 backdrop-blur-md shadow-sm flex items-center gap-1">
-                      <Eye className="w-3 h-3" />
-                      Homepage: {HOMEPAGE_SECTIONS.find(s => s.id === photo.homepage_section)?.label.split(" ")[0] || "Featured"}
-                    </span>
-                  )}
-                </div>
-
                 {/* Delete Action Button:
                     - Registered users can delete their own uploaded photos
                     - Admin overrides all user actions and can delete ANY photo */}
@@ -736,15 +709,6 @@ export default function Gallery() {
               {/* Sidebar Info */}
               <div className="lg:w-2/5 p-6 sm:p-8 flex flex-col justify-between space-y-6 overflow-y-auto bg-zinc-900 text-white">
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${activePhoto.badgeColor}`}>
-                      {activePhoto.categoryLabel}
-                    </span>
-                    <span className="text-xs font-mono text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
-                      {activePhoto.filename}
-                    </span>
-                  </div>
-
                   <div className="space-y-3 pt-2 text-xs text-zinc-400">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />

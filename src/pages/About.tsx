@@ -28,7 +28,8 @@ import {
   Plus,
   Check,
   Trash2,
-  Eye
+  Eye,
+  Maximize2
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { uploadGalleryPhoto, updateGalleryPhoto } from "../lib/api";
@@ -435,6 +436,9 @@ export default function About() {
           <motion.div variants={fadeIn} className="flex flex-wrap items-center justify-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] border border-emerald-500/25">
               <Sparkles className="w-3 h-3 text-emerald-400" />
+              Ka Mifuong'o North Kadem, Nyatike
+            </span>
+            <span className="px-3 py-1 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-bold uppercase tracking-wider border border-zinc-700">
               Registered Self-Help Group (S.H.G) • Est. 2019
             </span>
             <span className="px-3 py-1 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-bold uppercase tracking-wider border border-zinc-700">
@@ -454,7 +458,7 @@ export default function About() {
             variants={fadeIn}
             className="text-zinc-300 text-base sm:text-lg md:text-xl font-medium max-w-3xl mx-auto leading-relaxed"
           >
-            A community organization formed to improve the socioeconomic and geopolitical wellbeing of the people as well as support the vulnerable and needy through promoting unity of purpose and pooling of resources for mutual aid.
+            A community self-help organization rooted in <strong className="text-white font-bold">Ka Mifuong'o North Kadem, Nyatike</strong> Sub-County, established to advance socioeconomic empowerment, provide educational bursaries, and unite the 14 descendancy lineages of <strong className="text-white font-bold">Mifuong'o Raruoch</strong> through pooled mutual aid.
           </motion.p>
           
           <motion.div variants={fadeIn} className="flex flex-wrap justify-center gap-4 pt-4">
@@ -521,14 +525,14 @@ export default function About() {
             <p>
               The organization was founded by the visionary descendancy of the legendary 
               <strong className="text-zinc-900 font-bold"> Mifuong'o Raruoch (Ogola Fuong' Wuod Nyonyuka okew Sidho, okew gi Lwanda Magere)</strong> of the 
-              <strong className="text-zinc-900 font-bold"> Kadem Kanyuor clan</strong>, who, in the prehistoric era, led and organized the settlement of Jokadem in their present geographical locations.
+              <strong className="text-zinc-900 font-bold"> Kadem Kanyuor clan</strong>, who, in the prehistoric era, led and organized the settlement of Jokadem in their present geographical locations across <strong className="text-zinc-900 font-bold">Ka Mifuong'o North Kadem, Nyatike</strong> Sub-County.
             </p>
             <p>
               In 2019, the elders and community leaders formally constituted and registered the community with the 
               <strong className="text-zinc-900 font-bold"> State Department of Social Services</strong> as a registered Self-Help Group (S.H.G).
             </p>
             <p>
-              Today, the organization unites over <strong className="text-zinc-900 font-bold">3,000 adult members</strong> spread across various parts of North Kadem and the diaspora, structured into dedicated committees that turn traditional brotherhood into concrete mutual aid.
+              Today, the organization unites over <strong className="text-zinc-900 font-bold">3,000 adult members</strong> spread across <strong className="text-zinc-900 font-bold">Ka Mifuong'o North Kadem, Nyatike</strong> and the diaspora, structured into dedicated committees that turn traditional brotherhood into concrete mutual aid.
             </p>
           </div>
 
@@ -862,13 +866,10 @@ export default function About() {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2.5 flex flex-col justify-end">
-                    <p className="text-[11px] font-bold text-white line-clamp-2 leading-tight">
-                      {p.caption}
-                    </p>
-                    <span className="text-[9px] text-emerald-300 font-mono mt-0.5">
-                      {p.categoryLabel}
-                    </span>
+                  <div className="absolute inset-0 bg-zinc-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-white/90 text-zinc-900 flex items-center justify-center shadow-md">
+                      <Maximize2 className="w-4 h-4" />
+                    </div>
                   </div>
                 </Link>
               ))}

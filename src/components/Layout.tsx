@@ -20,8 +20,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="text-zinc-500 text-sm text-center md:text-left">
-              <p>© 2026 MIFUONG'O RARUOCH ORGANIZATION. Mutual aid & community empowerment.</p>
-              <p className="mt-1">
+              <p className="font-semibold text-zinc-700">Ka Mifuong'o North Kadem, Nyatike • Mifuong'o Raruoch Organization</p>
+              <p className="text-xs text-zinc-500 mt-0.5">© 2026 MIFUONG'O RARUOCH (S.H.G). Mutual aid, education bursaries & community empowerment.</p>
+              <p className="mt-1 text-xs">
                 developed by{" "}
                 <a 
                   href="https://odhistechie.web.app" 
@@ -31,6 +32,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 >
                   odhistechie.web.app
                 </a>
+                <span className="mx-2 text-zinc-300">•</span>
+                <span>Community Network: </span>
+                <a 
+                  href="https://anyuola-hub.vercel.app/" 
+                  target="_blank" 
+                  rel="noopener"
+                  className="text-emerald-600 hover:text-emerald-700 font-bold hover:underline"
+                  title="Anyuola Hub - Community Portal"
+                >
+                  Anyuola Hub
+                </a>
               </p>
             </div>
             <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4">
@@ -38,6 +50,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link to="/security" className="text-sm font-bold text-zinc-500 hover:text-brand transition-colors">Security</Link>
               <Link to="/welfare" className="text-sm font-bold text-zinc-500 hover:text-brand transition-colors">Welfare</Link>
               <Link to="/projects" className="text-sm font-bold text-zinc-500 hover:text-brand transition-colors">Projects</Link>
+              <a 
+                href="https://anyuola-hub.vercel.app/" 
+                target="_blank" 
+                rel="noopener"
+                className="text-sm font-bold text-emerald-700 hover:text-emerald-800 transition-colors flex items-center gap-1"
+              >
+                Anyuola Hub &nearr;
+              </a>
             </div>
           </div>
         </div>
