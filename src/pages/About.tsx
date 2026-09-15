@@ -250,8 +250,9 @@ export default function About() {
     { name: "Paul Aran Onditi", role: "Treasurer", title: "Founding Treasurer" },
     { name: "Peter Ooko Ogutu", role: "Organizing Secretary", title: "Organizing Secretary" },
     { name: "Chief Philip Opolo Orwa", role: "Technical Advisor", title: "Technical Advisor" },
-    { name: "David Ogutu", role: "Sub-Chair (Upper)", title: "Leadership Synod" },
-    { name: "Martin Duro", role: "Sub-Chair (Lower)", title: "Leadership Synod" },
+    { name: "David Ochieng Ogutu", role: "Sub-chair Upper Kamifuong'o", title: "Leadership Synod" },
+    { name: "Martin Duro", role: "Sub-chair Lower Kamifuong'o", title: "Leadership Synod" },
+    { name: "Zebedy Ngeta", role: "Diaspora Chairman", title: "Institutional Synod" },
   ];
 
   const lineages = [
@@ -280,8 +281,8 @@ export default function About() {
       num: 4,
       name: "Joka Nyakara",
       mother: "nyar Kakseru",
-      subfamilies: ["Odina", "Anyuor", "Mimbi", "Nyojero (Migogo)"],
-      details: "Prominent house including Odina, Anyuor, Mimbi, and Nyojero who holds the revered position of Migogo (daughter)."
+      subfamilies: ["Odina", "Anyuor (Anyuor Mang'ira / Kamang'ira)", "Mimbi", "Nyojero (Migogo)"],
+      details: "Prominent house including Odina, Anyuor (lineage ancestor of Anyuor Mang'ira / Kamang'ira), Mimbi, and Nyojero who holds the revered position of Migogo (daughter)."
     },
     {
       num: 5,
@@ -324,6 +325,13 @@ export default function About() {
       mother: "Ancestral Sons of Mifuong'o Raruoch",
       subfamilies: ["Sub-families of North Kadem & Diaspora"],
       details: "The surviving sons of the legendary founder whose families have branched across Kadem Kanyuor."
+    },
+    {
+      num: 11,
+      name: "Kamang'ira",
+      mother: "Lineage of Anyuor Mang'ira • Complex Unifier",
+      subfamilies: ["Kamang'ira", "Anyuor Mang'ira", "Mifuong'o Raruoch & Moth Ondigo Kinship"],
+      details: "From the lineage of Anyuor Mang'ira which plays the role of complex unifier as it transcends descendancy of both Mifuong'o Raruoch and his brother Moth Ondigo."
     }
   ];
 
@@ -563,17 +571,17 @@ export default function About() {
 
           <div className="space-y-3">
             {foundingLeaders.map((leader, i) => (
-              <div key={i} className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-800/60 border border-zinc-700/50 hover:border-emerald-500/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-black text-xs border border-emerald-500/20">
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-xl bg-zinc-800/60 border border-zinc-700/50 hover:border-emerald-500/50 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-black text-xs border border-emerald-500/20 shrink-0">
                     {leader.name.charAt(0)}
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-white leading-none">{leader.name}</p>
-                    <p className="text-[11px] text-zinc-400 mt-1">{leader.title}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-white leading-tight">{leader.name}</p>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">{leader.title}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-black px-2.5 py-1 rounded-md bg-zinc-700/60 text-emerald-400 border border-zinc-600 uppercase tracking-tight">
+                <span className="self-start sm:self-center text-[10px] font-black px-2.5 py-1 rounded-md bg-zinc-700/60 text-emerald-400 border border-zinc-600 uppercase tracking-tight shrink-0">
                   {leader.role}
                 </span>
               </div>
@@ -910,18 +918,33 @@ export default function About() {
             <motion.div 
               key={lineage.num}
               layout
-              className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+              className={`bg-white rounded-2xl p-6 border shadow-sm hover:shadow-md transition-all space-y-4 ${
+                lineage.name.includes("Kamang'ira") 
+                  ? "border-emerald-300 ring-1 ring-emerald-400/30 bg-gradient-to-b from-emerald-50/30 to-white" 
+                  : "border-zinc-200/80"
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white font-black text-sm flex items-center justify-center shadow-md">
+                  <div className={`w-8 h-8 rounded-xl font-black text-sm flex items-center justify-center shadow-md ${
+                    lineage.name.includes("Kamang'ira")
+                      ? "bg-emerald-700 text-white ring-2 ring-emerald-300"
+                      : "bg-emerald-600 text-white"
+                  }`}>
                     {lineage.num}
                   </div>
                   <div>
-                    <h4 className="font-black text-zinc-900 text-base leading-snug">{lineage.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-black text-zinc-900 text-base leading-snug">{lineage.name}</h4>
+                    </div>
                     <p className="text-[11px] font-semibold text-emerald-700">{lineage.mother}</p>
                   </div>
                 </div>
+                {lineage.name.includes("Kamang'ira") && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase tracking-wider border border-emerald-200 shrink-0">
+                    Complex Unifier
+                  </span>
+                )}
               </div>
 
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
@@ -936,7 +959,11 @@ export default function About() {
                   {lineage.subfamilies.map((sub, idx) => (
                     <span 
                       key={idx}
-                      className="px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-800 text-[11px] font-bold border border-zinc-200"
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
+                        lineage.name.includes("Kamang'ira")
+                          ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                          : "bg-zinc-100 text-zinc-800 border-zinc-200"
+                      }`}
                     >
                       {sub}
                     </span>
@@ -945,6 +972,35 @@ export default function About() {
               </div>
             </motion.div>
           ))}
+        </div>
+
+        {/* Dedicated Unifier Spotlight for Kamang'ira */}
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-emerald-950 via-zinc-900 to-zinc-950 text-white border border-emerald-500/30 shadow-xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center font-black shadow-inner shrink-0">
+                <Sparkles className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400">Sacred Kinship Bridge</span>
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">Kamang'ira — The Complex Unifier</h3>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
+              Lineage of Anyuor Mang'ira
+            </span>
+          </div>
+          <p className="text-sm sm:text-base text-zinc-300 font-medium leading-relaxed max-w-4xl">
+            <strong>Kamang'ira</strong> from the lineage of <strong>Anyuor Mang'ira</strong> plays the critical role of <em>complex unifier</em> as it transcends the descendancy of both <strong>Mifuong'o Raruoch</strong> and his brother <strong>Moth Ondigo</strong>. This vital lineage bridge unites ancestral branches across North Kadem, fostering harmony, shared heritage, and collective progress.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-800 text-xs text-zinc-400">
+            <span className="font-bold text-zinc-200">Ancestral Transcendence:</span>
+            <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-emerald-400 font-semibold border border-zinc-700">Mifuong'o Raruoch Descendancy</span>
+            <span className="text-zinc-500">&times;</span>
+            <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-emerald-400 font-semibold border border-zinc-700">Moth Ondigo Descendancy</span>
+            <span className="text-zinc-500">&rarr;</span>
+            <span className="px-2.5 py-0.5 rounded-md bg-emerald-950/80 text-emerald-300 font-semibold border border-emerald-800">Unified through Anyuor Mang'ira (Kamang'ira)</span>
+          </div>
         </div>
 
         <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-center text-xs text-zinc-500 font-medium">
@@ -1127,7 +1183,7 @@ export default function About() {
             },
             { 
               q: "How is the organization governed?", 
-              a: "The organization is led by the Founding Executive Committee (Chair, Sec, Treasurer, Org. Sec, Tech. Advisor, Sub-chairs) under the cultural patronage of the Leadership Synod headed by KER." 
+              a: "The organization is led by the Founding Executive Committee (Chairman, Secretary, Treasurer, Organizing Secretary, Technical Advisor, Sub-chair Upper Kamifuong'o, Sub-chair Lower Kamifuong'o, and Diaspora Chairman) under the cultural patronage of the Leadership Synod headed by KER." 
             }
           ].map((faq, i) => (
             <div key={i} className="p-6 rounded-2xl bg-white border border-zinc-200/80 shadow-sm space-y-2">

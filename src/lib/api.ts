@@ -197,15 +197,15 @@ export const DEFAULT_MEMBERS = [
   },
   {
     id: "mem-6",
-    name: "David Ogutu",
+    name: "David Ochieng Ogutu",
     phone: "0722000006",
     clan_id: "clan-1",
     role: "subgroup_manager",
-    subgroup: "Upper Kadem",
-    village: "Upper Kadem",
+    subgroup: "Upper Kamifuong'o",
+    village: "Upper Kamifuong'o",
     father_name: "Ogutu",
-    residence: "Upper Kadem",
-    title: "Sub-chair Upper"
+    residence: "Upper Kamifuong'o",
+    title: "Sub-chair Upper Kamifuong'o"
   },
   {
     id: "mem-7",
@@ -213,11 +213,23 @@ export const DEFAULT_MEMBERS = [
     phone: "0722000007",
     clan_id: "clan-1",
     role: "subgroup_manager",
-    subgroup: "Lower Kadem",
-    village: "Lower Kadem",
+    subgroup: "Lower Kamifuong'o",
+    village: "Lower Kamifuong'o",
     father_name: "Duro",
-    residence: "Lower Kadem",
-    title: "Sub-chair Lower"
+    residence: "Lower Kamifuong'o",
+    title: "Sub-chair Lower Kamifuong'o"
+  },
+  {
+    id: "mem-8",
+    name: "Zebedy Ngeta",
+    phone: "0722000008",
+    clan_id: "clan-1",
+    role: "subgroup_manager",
+    subgroup: "Diaspora",
+    village: "North Kadem Diaspora",
+    father_name: "Ngeta",
+    residence: "Diaspora",
+    title: "Diaspora Chairman"
   }
 ];
 

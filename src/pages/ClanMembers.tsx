@@ -311,6 +311,7 @@ export default function ClanMembers() {
                         <option value="Joka Tagaya Obware" />
                         <option value="Joka Moth" />
                         <option value="Joka Nyakara" />
+                        <option value="Kamang'ira (Anyuor Mang'ira)" />
                         <option value="Joka Obwanga" />
                         <option value="Joka Ong'ele Osodhi" />
                         <option value="Joka Saronge" />
@@ -321,6 +322,8 @@ export default function ClanMembers() {
                         <option value="Joka Omach Maraki" />
                         <option value="Joka Ngeta Ondego" />
                         <option value="Joka Otieno Suta" />
+                        <option value="Upper Kamifuong'o" />
+                        <option value="Lower Kamifuong'o" />
                         <option value="North Kadem Diaspora" />
                       </datalist>
                     </div>
