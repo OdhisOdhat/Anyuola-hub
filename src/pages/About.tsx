@@ -749,6 +749,15 @@ export default function About() {
               <p className="text-zinc-600 text-sm font-medium leading-relaxed">
                 Mifuong'o Raruoch executive leadership and Education Committee convening in North Kadem to formally issue academic bursaries to vulnerable students and parents, ensuring unhindered school attendance.
               </p>
+              <div className="pt-2">
+                <Link
+                  to="/education-funding"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-md hover:shadow-lg cursor-pointer"
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  Fill Education Funding / Bursary Form &rarr;
+                </Link>
+              </div>
             </div>
           </motion.div>
 

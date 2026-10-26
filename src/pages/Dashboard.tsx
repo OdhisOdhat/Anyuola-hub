@@ -8,7 +8,8 @@ import {
   ArrowRight,
   Settings,
   Upload,
-  Palette
+  Palette,
+  GraduationCap
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { fetchClan, fetchAlerts, fetchProjects, fetchEvents } from "../lib/api";
@@ -142,6 +143,14 @@ export default function Dashboard() {
             >
               Support Welfare
               <ArrowRight className="w-4 h-4" />
+            </Link>
+
+            <Link 
+              to="/education-funding" 
+              className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-bold transition-all border border-zinc-700 flex items-center gap-2"
+            >
+              <GraduationCap className="w-4 h-4 text-emerald-400" />
+              Apply for Bursary
             </Link>
             
             {user?.role === 'admin' && (

@@ -129,10 +129,17 @@ export default function Welfare() {
             Every contribution strengthens our collective resilience.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Link 
+            to="/education-funding"
+            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 shrink-0 text-sm"
+          >
+            <GraduationCap className="w-5 h-5" />
+            Apply for Bursary
+          </Link>
           <Link 
             to="/contribute"
-            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 shrink-0"
+            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 shrink-0 text-sm"
           >
             <DollarSign className="w-5 h-5" />
             Contribute Funds

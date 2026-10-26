@@ -740,3 +740,286 @@ export async function deleteGalleryPhoto(id: string, src?: string, filename?: st
 export async function resetGalleryPhotos() {
   return await resetArchiveToDefaults();
 }
+
+// ==========================================
+// EDUCATION FUNDING & BURSARIES API
+// ==========================================
+
+export interface BursaryApplication {
+  id: string;
+  reference_number: string;
+  clan_id: string;
+  created_at: string;
+  updated_at: string;
+  status: "pending" | "under_review" | "approved" | "disbursed" | "rejected";
+  admin_notes?: string;
+  disbursed_amount?: number;
+
+  // Applicant Information
+  student_name: string;
+  gender: "Male" | "Female" | "Other";
+  dob: string;
+  phone: string;
+  email?: string;
+  id_or_birth_cert_no: string;
+
+  // Residence Details (Crucial requirement)
+  residence_region: "Upper Kamifuong'o" | "Lower Kamifuong'o" | "Diaspora" | "Other North Kadem";
+  county: string;
+  sub_county: string;
+  ward: string;
+  village: string;
+  physical_address: string;
+  residence_category: "Resident in North Kadem" | "Diaspora (Migori/Nairobi/Other)" | "Relocated Member";
+
+  // Clan Lineage Details (Crucial requirement)
+  clan_lineage_house: string;
+  sub_family: string;
+  father_name: string;
+  mother_name: string;
+  maternal_lineage?: string;
+  clan_elder_or_subchair: string;
+
+  // Academic Institution Details
+  education_level: "Secondary School" | "Vocational / TVET / Poly" | "College / Diploma" | "Undergraduate University" | "Postgraduate";
+  institution_name: string;
+  admission_number: string;
+  year_or_form: string;
+  course_of_study?: string;
+  academic_performance: string;
+
+  // Financial Need & Family Vulnerability
+  annual_fees_required: number;
+  amount_requested: number;
+  family_status: "Total Orphan" | "Partial Orphan" | "Single Parent" | "Both Parents Living (Vulnerable/Low-Income)" | "Person with Disability (PWD)" | "Child-Headed Household";
+  guardian_name: string;
+  guardian_phone: string;
+  guardian_occupation: string;
+  siblings_count_in_school: number;
+  statement_of_need: string;
+
+  // Verification References
+  local_area_chief?: string;
+  recommendation_contact?: string;
+}
+
+const LOCAL_STORAGE_BURSARIES_KEY = "mro_bursary_applications_cache";
+
+function getLocalBursariesCache(): BursaryApplication[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_BURSARIES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return [];
+}
+
+function saveLocalBursariesCache(apps: BursaryApplication[]) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_BURSARIES_KEY, JSON.stringify(apps));
+  } catch (e) {
+    // ignore
+  }
+}
+
+export async function fetchBursaries(clanId: string = "clan-1"): Promise<BursaryApplication[]> {
+  try {
+    const res = await fetch(`${API_BASE}/bursaries`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        saveLocalBursariesCache(data);
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to fetch bursaries from API, checking local cache / static JSON:", err);
+  }
+
+  // Fallback 1: LocalStorage Cache
+  const cached = getLocalBursariesCache();
+  if (cached.length > 0) return cached;
+
+  // Fallback 2: Static JSON file in public/
+  try {
+    const res = await fetch("/bursaries.json");
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        saveLocalBursariesCache(data);
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to fetch static /bursaries.json:", err);
+  }
+
+  return [];
+}
+
+export async function trackBursaryApplication(lookupQuery: string): Promise<BursaryApplication[]> {
+  const query = lookupQuery.trim();
+  if (!query) return [];
+
+  try {
+    const res = await fetch(`${API_BASE}/bursaries/track/${encodeURIComponent(query)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    }
+  } catch (e) {
+    console.warn("Track API query failed, searching local cache:", e);
+  }
+
+  // Local search fallback
+  const all = await fetchBursaries();
+  const cleanQ = query.toLowerCase().replace(/[\s\-_]/g, "");
+  return all.filter(b => {
+    const ref = (b.reference_number || "").toLowerCase().replace(/[\s\-_]/g, "");
+    const phone = (b.phone || "").toLowerCase().replace(/[\s\-_]/g, "");
+    const idNo = (b.id_or_birth_cert_no || "").toLowerCase().replace(/[\s\-_]/g, "");
+    const name = (b.student_name || "").toLowerCase();
+    return ref.includes(cleanQ) || phone.includes(cleanQ) || idNo.includes(cleanQ) || name.includes(query.toLowerCase());
+  });
+}
+
+export async function submitBursaryApplication(data: Partial<BursaryApplication>): Promise<{ success: boolean; application: BursaryApplication; reference_number: string }> {
+  try {
+    const headers = await getHeaders().catch(() => ({ "Content-Type": "application/json" }));
+    const res = await fetch(`${API_BASE}/bursaries`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      // Update local cache
+      const cached = getLocalBursariesCache();
+      if (result.application) {
+        saveLocalBursariesCache([result.application, ...cached.filter(a => a.id !== result.application.id)]);
+      }
+      return result;
+    }
+  } catch (err) {
+    console.warn("POST /api/bursaries failed, using resilient local storage submission:", err);
+  }
+
+  // Resilient fallback
+  const seq = Math.floor(1000 + Math.random() * 9000);
+  const year = new Date().getFullYear();
+  const reference_number = data.reference_number || `MRO-EDU-${year}-${seq}`;
+  const id = `bursary-${Date.now()}`;
+
+  const newApp: BursaryApplication = {
+    id,
+    reference_number,
+    clan_id: data.clan_id || "clan-1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    status: "pending",
+    admin_notes: "Application received. Pending Education Committee review.",
+    disbursed_amount: 0,
+    student_name: data.student_name || "Applicant",
+    gender: data.gender || "Male",
+    dob: data.dob || "2006-01-01",
+    phone: data.phone || "",
+    email: data.email || "",
+    id_or_birth_cert_no: data.id_or_birth_cert_no || "",
+    residence_region: data.residence_region || "Upper Kamifuong'o",
+    county: data.county || "Migori",
+    sub_county: data.sub_county || "Nyatike",
+    ward: data.ward || "North Kadem",
+    village: data.village || "",
+    physical_address: data.physical_address || "",
+    residence_category: data.residence_category || "Resident in North Kadem",
+    clan_lineage_house: data.clan_lineage_house || "Joka Ogiro Magota",
+    sub_family: data.sub_family || "",
+    father_name: data.father_name || "",
+    mother_name: data.mother_name || "",
+    maternal_lineage: data.maternal_lineage || "",
+    clan_elder_or_subchair: data.clan_elder_or_subchair || "David Ochieng Ogutu (Sub-chair Upper Kamifuong'o)",
+    education_level: data.education_level || "Secondary School",
+    institution_name: data.institution_name || "",
+    admission_number: data.admission_number || "",
+    year_or_form: data.year_or_form || "",
+    course_of_study: data.course_of_study || "",
+    academic_performance: data.academic_performance || "",
+    annual_fees_required: Number(data.annual_fees_required) || 0,
+    amount_requested: Number(data.amount_requested) || 0,
+    family_status: data.family_status || "Partial Orphan",
+    guardian_name: data.guardian_name || "",
+    guardian_phone: data.guardian_phone || "",
+    guardian_occupation: data.guardian_occupation || "",
+    siblings_count_in_school: Number(data.siblings_count_in_school) || 1,
+    statement_of_need: data.statement_of_need || "",
+    local_area_chief: data.local_area_chief || "Chief Philip Opolo Orwa",
+    recommendation_contact: data.recommendation_contact || ""
+  };
+
+  const cached = getLocalBursariesCache();
+  saveLocalBursariesCache([newApp, ...cached]);
+
+  return { success: true, application: newApp, reference_number };
+}
+
+export async function updateBursaryApplication(id: string, data: Partial<BursaryApplication>): Promise<{ success: boolean; application?: BursaryApplication }> {
+  try {
+    const headers = await getHeaders().catch(() => ({ "Content-Type": "application/json" }));
+    const res = await fetch(`${API_BASE}/bursaries/${id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      const result = await res.json();
+      const cached = getLocalBursariesCache();
+      const idx = cached.findIndex(a => a.id === id);
+      if (idx !== -1 && result.application) {
+        cached[idx] = result.application;
+        saveLocalBursariesCache([...cached]);
+      }
+      return result;
+    }
+  } catch (err) {
+    console.warn("PATCH /api/bursaries/:id failed, updating local cache:", err);
+  }
+
+  // Local fallback
+  const cached = getLocalBursariesCache();
+  const idx = cached.findIndex(a => a.id === id);
+  if (idx !== -1) {
+    cached[idx] = { ...cached[idx], ...data, updated_at: new Date().toISOString() };
+    saveLocalBursariesCache([...cached]);
+    return { success: true, application: cached[idx] };
+  }
+
+  return { success: false };
+}
+
+export async function deleteBursaryApplication(id: string): Promise<{ success: boolean }> {
+  try {
+    const headers = await getHeaders().catch(() => ({ "Content-Type": "application/json" }));
+    const res = await fetch(`${API_BASE}/bursaries/${id}`, {
+      method: "DELETE",
+      headers
+    });
+    if (res.ok) {
+      const cached = getLocalBursariesCache();
+      saveLocalBursariesCache(cached.filter(a => a.id !== id));
+      return { success: true };
+    }
+  } catch (err) {
+    console.warn("DELETE /api/bursaries/:id failed:", err);
+  }
+
+  const cached = getLocalBursariesCache();
+  saveLocalBursariesCache(cached.filter(a => a.id !== id));
+  return { success: true };
+}

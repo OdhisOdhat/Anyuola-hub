@@ -19,7 +19,8 @@ import {
   FileText,
   Settings,
   Bell,
-  Camera
+  Camera,
+  GraduationCap
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
@@ -83,6 +84,7 @@ export default function Navbar() {
   }, [user?.clan_id]);
 
   const communityItems = [
+    { name: "Education Bursaries", path: "/education-funding", icon: GraduationCap },
     { name: "Photo Gallery", path: "/gallery", icon: Camera },
     { name: "Members", path: "/members", icon: Users },
     { name: "Welfare", path: "/welfare", icon: HeartHandshake },
@@ -161,6 +163,20 @@ export default function Navbar() {
               style={location.pathname === "/gallery" ? { color: branding.primary_color, backgroundColor: `${branding.primary_color}10` } : {}}
             >
               Gallery
+            </Link>
+
+            <Link
+              to="/education-funding"
+              className={cn(
+                "px-3 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5",
+                location.pathname.startsWith("/education-funding") || location.pathname.startsWith("/bursary-application")
+                  ? "text-zinc-900" 
+                  : "text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+              )}
+              style={location.pathname.startsWith("/education-funding") || location.pathname.startsWith("/bursary-application") ? { color: branding.primary_color, backgroundColor: `${branding.primary_color}10` } : {}}
+            >
+              <GraduationCap className="w-4 h-4 text-emerald-600" />
+              <span>Apply Bursary</span>
             </Link>
 
             {user && (
@@ -413,6 +429,14 @@ export default function Navbar() {
                 className="block px-4 py-3 rounded-xl text-base font-bold text-zinc-900 hover:bg-zinc-50"
               >
                 Gallery
+              </Link>
+              <Link
+                to="/education-funding"
+                onClick={() => setIsOpen(false)}
+                className="block px-4 py-3 rounded-xl text-base font-bold text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 flex items-center gap-2"
+              >
+                <GraduationCap className="w-5 h-5 text-emerald-600" />
+                <span>Education Bursary Application</span>
               </Link>
               {user && (
                 <>

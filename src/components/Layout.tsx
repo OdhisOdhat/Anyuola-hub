@@ -47,6 +47,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4">
               <Link to="/" className="text-sm font-bold text-zinc-500 hover:text-brand transition-colors">About Us</Link>
+              <Link to="/education-funding" className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">Bursary Form</Link>
               <Link to="/security" className="text-sm font-bold text-zinc-500 hover:text-brand transition-colors">Security</Link>
               <Link to="/welfare" className="text-sm font-bold text-zinc-500 hover:text-brand transition-colors">Welfare</Link>
               <Link to="/projects" className="text-sm font-bold text-zinc-500 hover:text-brand transition-colors">Projects</Link>

@@ -17,6 +17,7 @@ import AdminCMS from "./pages/AdminCMS";
 import Messages from "./pages/Messages";
 import Profile from "./pages/Profile";
 import FinancialReport from "./pages/FinancialReport";
+import EducationFunding from "./pages/EducationFunding";
 import { fetchClan } from "./lib/api";
 
 // This component handles the global branding application
@@ -87,6 +88,8 @@ export default function App() {
             <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/financial-report" element={<ProtectedRoute><FinancialReport /></ProtectedRoute>} />
+            <Route path="/education-funding" element={<Layout><EducationFunding /></Layout>} />
+            <Route path="/bursary-application" element={<Layout><EducationFunding /></Layout>} />
             <Route path="/admin/members" element={<ProtectedRoute><MemberManagement /></ProtectedRoute>} />
             <Route path="/admin/cms" element={<ProtectedRoute><AdminCMS /></ProtectedRoute>} />
           </Routes>

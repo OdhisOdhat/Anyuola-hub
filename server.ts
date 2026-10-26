@@ -53,6 +53,7 @@ const localStore: {
   ads: any[];
   gallery: any[];
   deletedPhotos: any[];
+  bursaries: any[];
 } = {
   clan: {
     id: "clan-1",
@@ -314,12 +315,47 @@ const localStore: {
   blogs: [] as any[],
   ads: [] as any[],
   gallery: [] as any[],
-  deletedPhotos: [] as any[]
+  deletedPhotos: [] as any[],
+  bursaries: [] as any[]
 };
 
-// Persistent Gallery File Setup
+// Persistent Storage File Setup
 const GALLERY_STORAGE_FILE = path.join(process.cwd(), "public", "gallery.json");
 const DELETED_STORAGE_FILE = path.join(process.cwd(), "public", "deleted_photos.json");
+const BURSARY_STORAGE_FILE = path.join(process.cwd(), "public", "bursaries.json");
+
+function loadBursaryStore(): any[] {
+  try {
+    if (fs.existsSync(BURSARY_STORAGE_FILE)) {
+      const raw = fs.readFileSync(BURSARY_STORAGE_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn("[Bursary] Error reading bursaries.json:", err);
+  }
+  return [];
+}
+
+function saveBursaryStore(bursaries: any[]) {
+  try {
+    const dir = path.dirname(BURSARY_STORAGE_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(BURSARY_STORAGE_FILE, JSON.stringify(bursaries, null, 2), "utf-8");
+    const distBursaryFile = path.join(process.cwd(), "dist", "bursaries.json");
+    if (fs.existsSync(path.dirname(distBursaryFile))) {
+      try {
+        fs.writeFileSync(distBursaryFile, JSON.stringify(bursaries, null, 2), "utf-8");
+      } catch (distErr) {}
+    }
+  } catch (err) {
+    console.error("[Bursary] Failed to write bursaries.json:", err);
+  }
+}
 
 // Only actual photographs uploaded by administrators or registered users are maintained in the archive.
 // Stock sample mock photos have been completely removed per administrator directive.
@@ -440,6 +476,7 @@ function saveGalleryStore(photos: any[]) {
 // Populate local store on startup
 localStore.deletedPhotos = loadDeletedStore();
 localStore.gallery = loadGalleryStore();
+localStore.bursaries = loadBursaryStore();
 
 // Helper: check if Supabase is alive without throwing
 async function trySupabase<T>(fn: () => Promise<T>): Promise<{ data: T | null; error: any }> {
@@ -977,6 +1014,82 @@ app.patch("/api/contributions/:id", async (req, res) => {
     }
   }
 
+  res.json({ success: true });
+});
+
+// --- Education Bursaries / Funding Applications ---
+app.get("/api/bursaries", (req, res) => {
+  res.json(localStore.bursaries);
+});
+
+app.get("/api/clan/:id/bursaries", (req, res) => {
+  res.json(localStore.bursaries);
+});
+
+// Lookup application by reference number, phone, or ID/birth cert number
+app.get("/api/bursaries/track/:lookup", (req, res) => {
+  const query = (req.params.lookup || "").trim().toLowerCase();
+  if (!query) {
+    return res.json([]);
+  }
+  const cleanQuery = query.replace(/[\s\-_]/g, "");
+  const found = localStore.bursaries.filter(b => {
+    const ref = (b.reference_number || "").toLowerCase().replace(/[\s\-_]/g, "");
+    const phone = (b.phone || "").toLowerCase().replace(/[\s\-_]/g, "");
+    const idNo = (b.id_or_birth_cert_no || "").toLowerCase().replace(/[\s\-_]/g, "");
+    const name = (b.student_name || "").toLowerCase();
+    return ref.includes(cleanQuery) || phone.includes(cleanQuery) || idNo.includes(cleanQuery) || name.includes(query);
+  });
+  res.json(found);
+});
+
+// Submit new bursary application
+app.post("/api/bursaries", (req, res) => {
+  const body = req.body;
+  const seq = Math.floor(1000 + Math.random() * 9000);
+  const year = new Date().getFullYear();
+  const reference_number = body.reference_number || `MRO-EDU-${year}-${seq}`;
+  const id = `bursary-${Date.now()}`;
+
+  const newApp = {
+    id,
+    reference_number,
+    clan_id: body.clan_id || "clan-1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    status: "pending",
+    admin_notes: "Application received. Pending Education Committee review.",
+    disbursed_amount: 0,
+    ...body
+  };
+
+  localStore.bursaries.unshift(newApp);
+  saveBursaryStore(localStore.bursaries);
+
+  res.status(201).json({ success: true, id, reference_number, application: newApp });
+});
+
+// Update bursary application status / committee review
+app.patch("/api/bursaries/:id", (req, res) => {
+  const appIndex = localStore.bursaries.findIndex(b => b.id === req.params.id);
+  if (appIndex === -1) {
+    return res.status(404).json({ error: "Application not found" });
+  }
+
+  localStore.bursaries[appIndex] = {
+    ...localStore.bursaries[appIndex],
+    ...req.body,
+    updated_at: new Date().toISOString()
+  };
+
+  saveBursaryStore(localStore.bursaries);
+  res.json({ success: true, application: localStore.bursaries[appIndex] });
+});
+
+// Delete bursary application
+app.delete("/api/bursaries/:id", (req, res) => {
+  localStore.bursaries = localStore.bursaries.filter(b => b.id !== req.params.id);
+  saveBursaryStore(localStore.bursaries);
   res.json({ success: true });
 });
 
