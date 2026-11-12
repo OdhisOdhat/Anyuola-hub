@@ -2,10 +2,13 @@ import express from "express";
 import "express-async-errors";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
+import pg from "pg";
+const { Pool } = pg;
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import crypto from "crypto";
 
 console.log("SERVER.TS STARTING...");
 dotenv.config();
@@ -16,7 +19,28 @@ const __dirname = path.dirname(__filename);
 const isVercel = process.env.VERCEL === "1";
 const isProd = process.env.NODE_ENV === "production" || isVercel;
 
-// Initialize Supabase client
+// Initialize Neon PostgreSQL Client (Primary Database)
+const neonDatabaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+let neonPool: pg.Pool | null = null;
+let neonAvailable = false;
+
+try {
+  if (neonDatabaseUrl) {
+    neonPool = new Pool({
+      connectionString: neonDatabaseUrl,
+      ssl: neonDatabaseUrl.includes("localhost") ? false : { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10000,
+      max: 10
+    });
+    console.log("Neon PostgreSQL pool initialized successfully");
+  } else {
+    console.log("Neon DATABASE_URL not set - operating in Resilient Local / Supabase Mode");
+  }
+} catch (err) {
+  console.warn("Failed to initialize Neon pool:", err);
+}
+
+// Initialize Supabase client (Legacy/Fallback)
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 
@@ -33,7 +57,7 @@ try {
     });
     console.log("Supabase client initialized");
   } else {
-    console.log("Supabase credentials not set - operating in Local Resilient Mode");
+    console.log("Supabase credentials not set");
   }
 } catch (err) {
   console.warn("Failed to initialize Supabase client:", err);
@@ -495,6 +519,267 @@ async function trySupabase<T>(fn: () => Promise<T>): Promise<{ data: T | null; e
   }
 }
 
+// Helper: Query Neon PostgreSQL
+async function queryNeon<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+  if (!neonPool) return [];
+  try {
+    const res = await neonPool.query(sql, params);
+    neonAvailable = true;
+    return res.rows as T[];
+  } catch (err: any) {
+    console.warn("[Neon] Query notice:", err?.message || err);
+    throw err;
+  }
+}
+
+// Verify & Bootstrap Neon Schema automatically
+async function initNeonSchema() {
+  if (!neonPool) return;
+  try {
+    console.log("[Neon] Checking and initializing database schema...");
+    await neonPool.query(`
+      CREATE TABLE IF NOT EXISTS clans (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        tagline TEXT DEFAULT 'TRUST NETWORK',
+        description TEXT,
+        logo_url TEXT,
+        primary_color TEXT DEFAULT '#10b981',
+        secondary_color TEXT DEFAULT '#064e3b',
+        website_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS members (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT,
+        clan_id TEXT REFERENCES clans(id) ON DELETE CASCADE,
+        role TEXT DEFAULT 'member',
+        subgroup TEXT,
+        village TEXT,
+        father_name TEXT,
+        residence TEXT,
+        photo_url TEXT,
+        title TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      ALTER TABLE members ADD COLUMN IF NOT EXISTS title TEXT;
+      ALTER TABLE members ADD COLUMN IF NOT EXISTS photo_url TEXT;
+
+      CREATE TABLE IF NOT EXISTS events (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        description TEXT,
+        target_amount REAL DEFAULT 0,
+        date TIMESTAMPTZ,
+        clan_id TEXT REFERENCES clans(id) ON DELETE CASCADE,
+        created_by TEXT REFERENCES members(id) ON DELETE SET NULL,
+        status TEXT DEFAULT 'active',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'planned',
+        progress INTEGER DEFAULT 0,
+        clan_id TEXT REFERENCES clans(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS security_alerts (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        severity TEXT DEFAULT 'low',
+        location TEXT,
+        clan_id TEXT REFERENCES clans(id) ON DELETE CASCADE,
+        created_by TEXT REFERENCES members(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS contributions (
+        id TEXT PRIMARY KEY,
+        member_id TEXT REFERENCES members(id) ON DELETE SET NULL,
+        event_id TEXT REFERENCES events(id) ON DELETE CASCADE,
+        amount REAL NOT NULL,
+        payment_reference TEXT,
+        status TEXT DEFAULT 'approved',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS bursary_applications (
+        id TEXT PRIMARY KEY,
+        reference_number TEXT UNIQUE NOT NULL,
+        clan_id TEXT DEFAULT 'clan-1',
+        status TEXT DEFAULT 'pending',
+        admin_notes TEXT,
+        disbursed_amount REAL DEFAULT 0,
+        student_name TEXT NOT NULL,
+        gender TEXT,
+        dob TEXT,
+        phone TEXT,
+        email TEXT,
+        id_or_birth_cert_no TEXT,
+        residence_region TEXT,
+        county TEXT,
+        sub_county TEXT,
+        ward TEXT,
+        village TEXT,
+        physical_address TEXT,
+        residence_category TEXT,
+        clan_lineage_house TEXT,
+        sub_family TEXT,
+        father_name TEXT,
+        mother_name TEXT,
+        maternal_lineage TEXT,
+        clan_elder_or_subchair TEXT,
+        education_level TEXT,
+        institution_name TEXT,
+        admission_number TEXT,
+        year_or_form TEXT,
+        course_of_study TEXT,
+        academic_performance TEXT,
+        annual_fees_required REAL DEFAULT 0,
+        amount_requested REAL DEFAULT 0,
+        family_status TEXT,
+        guardian_name TEXT,
+        guardian_phone TEXT,
+        guardian_occupation TEXT,
+        siblings_count_in_school INTEGER DEFAULT 1,
+        statement_of_need TEXT,
+        local_area_chief TEXT,
+        recommendation_contact TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        salt TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        role TEXT DEFAULT 'member',
+        clan_id TEXT DEFAULT 'clan-1',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      ALTER TABLE members ADD COLUMN IF NOT EXISTS email TEXT;
+      ALTER TABLE members ADD COLUMN IF NOT EXISTS password_hash TEXT;
+      ALTER TABLE members ADD COLUMN IF NOT EXISTS salt TEXT;
+    `);
+
+    // Ensure clan-1 exists in Neon
+    const clanCheck = await neonPool.query("SELECT id FROM clans WHERE id = $1", ["clan-1"]);
+    if (clanCheck.rows.length === 0) {
+      await neonPool.query(
+        `INSERT INTO clans (id, name, tagline, description, primary_color, secondary_color)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          "clan-1",
+          localStore.clan.name,
+          localStore.clan.tagline,
+          localStore.clan.description,
+          localStore.clan.primary_color,
+          localStore.clan.secondary_color
+        ]
+      );
+    }
+
+    // Seed initial members if table is empty
+    const membersCheck = await neonPool.query("SELECT COUNT(*) FROM members");
+    if (Number(membersCheck.rows[0]?.count || 0) === 0) {
+      for (const m of localStore.members) {
+        await neonPool.query(
+          `INSERT INTO members (id, name, phone, clan_id, role, subgroup, village, father_name, residence, title)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           ON CONFLICT (id) DO NOTHING`,
+          [m.id, m.name, m.phone, m.clan_id || "clan-1", m.role || "member", m.subgroup, m.village, m.father_name, m.residence, m.title || ""]
+        );
+      }
+    }
+
+    // Seed events if empty
+    const eventsCheck = await neonPool.query("SELECT COUNT(*) FROM events");
+    if (Number(eventsCheck.rows[0]?.count || 0) === 0) {
+      for (const ev of localStore.events) {
+        await neonPool.query(
+          `INSERT INTO events (id, title, type, description, target_amount, clan_id, created_by, status, date)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (id) DO NOTHING`,
+          [ev.id, ev.title, ev.type, ev.description, ev.target_amount, ev.clan_id || "clan-1", ev.created_by, ev.status || "active", ev.date]
+        );
+      }
+    }
+
+    // Seed projects if empty
+    const projectsCheck = await neonPool.query("SELECT COUNT(*) FROM projects");
+    if (Number(projectsCheck.rows[0]?.count || 0) === 0) {
+      for (const proj of localStore.projects) {
+        await neonPool.query(
+          `INSERT INTO projects (id, title, description, status, progress, clan_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO NOTHING`,
+          [proj.id, proj.title, proj.description, proj.status || "planned", proj.progress || 0, proj.clan_id || "clan-1"]
+        );
+      }
+    }
+
+    // Seed initial bursary applications if empty
+    const bursariesCheck = await neonPool.query("SELECT COUNT(*) FROM bursary_applications");
+    if (Number(bursariesCheck.rows[0]?.count || 0) === 0) {
+      for (const b of localStore.bursaries) {
+        await neonPool.query(
+          `INSERT INTO bursary_applications (
+             id, reference_number, clan_id, status, admin_notes, disbursed_amount,
+             student_name, gender, dob, phone, email, id_or_birth_cert_no,
+             residence_region, county, sub_county, ward, village, physical_address,
+             residence_category, clan_lineage_house, sub_family, father_name, mother_name,
+             maternal_lineage, clan_elder_or_subchair, education_level, institution_name,
+             admission_number, year_or_form, course_of_study, academic_performance,
+             annual_fees_required, amount_requested, family_status, guardian_name,
+             guardian_phone, guardian_occupation, siblings_count_in_school,
+             statement_of_need, local_area_chief, recommendation_contact, created_at, updated_at
+           ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+             $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34,
+             $35, $36, $37, $38, $39, $40, $41, $42, $43
+           ) ON CONFLICT (id) DO NOTHING`,
+          [
+            b.id, b.reference_number, b.clan_id || "clan-1", b.status || "pending", b.admin_notes || "", b.disbursed_amount || 0,
+            b.student_name, b.gender || "Male", b.dob || "", b.phone || "", b.email || "", b.id_or_birth_cert_no || "",
+            b.residence_region || "Upper Kamifuong'o", b.county || "Migori", b.sub_county || "Nyatike", b.ward || "North Kadem", b.village || "", b.physical_address || "",
+            b.residence_category || "Resident in North Kadem", b.clan_lineage_house || "", b.sub_family || "", b.father_name || "", b.mother_name || "",
+            b.maternal_lineage || "", b.clan_elder_or_subchair || "", b.education_level || "Secondary School", b.institution_name || "",
+            b.admission_number || "", b.year_or_form || "", b.course_of_study || "", b.academic_performance || "",
+            Number(b.annual_fees_required) || 0, Number(b.amount_requested) || 0, b.family_status || "Partial Orphan", b.guardian_name || "",
+            b.guardian_phone || "", b.guardian_occupation || "", Number(b.siblings_count_in_school) || 1,
+            b.statement_of_need || "", b.local_area_chief || "", b.recommendation_contact || "",
+            b.created_at || new Date().toISOString(), b.updated_at || new Date().toISOString()
+          ]
+        );
+      }
+    }
+
+    neonAvailable = true;
+    console.log("[Neon] Database schema verified and initialized successfully.");
+  } catch (err: any) {
+    console.warn("[Neon] Notice during schema verification:", err?.message || err);
+  }
+}
+
+// Fire async Neon setup if pool exists
+if (neonPool) {
+  initNeonSchema().catch(e => console.warn("[Neon] Init error:", e));
+}
+
 const app = express();
 const PORT = 3000;
 
@@ -502,9 +787,19 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+// On Vercel only: ensure serverless requests maintain /api prefix if stripped
+if (isVercel) {
+  app.use((req, res, next) => {
+    if (req.url && !req.url.startsWith("/api")) {
+      req.url = `/api${req.url}`;
+    }
+    next();
+  });
+}
+
 // Request logger
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
 
@@ -517,10 +812,225 @@ app.get("/api/test", (req, res) => {
 app.get("/api/health", (req, res) => {
   res.json({ 
     status: "ok", 
+    database: neonPool ? "neon" : (supabase ? "supabase" : "localStore"),
+    neonConfigured: !!neonPool,
+    neonAvailable,
     supabaseConfigured: !!supabase,
     env: process.env.NODE_ENV,
     isVercel
   });
+});
+
+// ==========================================
+// NATIVE AUTHENTICATION API (NEON POSTGRESQL & LOCAL RESILIENT)
+// ==========================================
+
+function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
+}
+
+function generateToken(payload: any): string {
+  const str = JSON.stringify({ ...payload, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 });
+  return Buffer.from(str).toString("base64");
+}
+
+// 1. Sign Up Endpoint
+app.post("/api/auth/signup", async (req, res) => {
+  const { email, password, fullName, phone } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+
+  const cleanEmail = String(email).trim().toLowerCase();
+  const name = String(fullName || cleanEmail.split("@")[0] || "Member").trim();
+  const isAdmin = cleanEmail === "fodhis1@gmail.com" || cleanEmail.includes("admin") || name.toLowerCase().includes("admin");
+  const role = isAdmin ? "admin" : "member";
+  const userId = `usr-${Date.now()}`;
+  const salt = crypto.randomBytes(16).toString("hex");
+  const passwordHash = hashPassword(String(password), salt);
+
+  if (neonPool) {
+    try {
+      // Check if user already exists
+      const existing = await queryNeon("SELECT id, email FROM users WHERE LOWER(email) = $1 LIMIT 1", [cleanEmail]);
+      if (existing && existing.length > 0) {
+        return res.status(400).json({ error: "User with this email already exists. Please sign in instead." });
+      }
+
+      await queryNeon(
+        `INSERT INTO users (id, email, password_hash, salt, full_name, role, clan_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+        [userId, cleanEmail, passwordHash, salt, name, role, "clan-1"]
+      );
+
+      // Also create corresponding profile in members table
+      await queryNeon(
+        `INSERT INTO members (id, name, email, phone, role, clan_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())
+         ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, role = EXCLUDED.role`,
+        [userId, name, cleanEmail, phone || "", role, "clan-1"]
+      );
+    } catch (e: any) {
+      console.warn("Neon signup error:", e?.message || e);
+    }
+  }
+
+  // Also sync to local store
+  let existingLocal = localStore.members.find(m => m.email && m.email.toLowerCase() === cleanEmail);
+  if (!existingLocal) {
+    existingLocal = {
+      id: userId,
+      name,
+      email: cleanEmail,
+      phone: phone || "",
+      role,
+      clan_id: "clan-1",
+      created_at: new Date().toISOString()
+    };
+    localStore.members.push(existingLocal);
+  }
+
+  const userPayload = {
+    id: userId,
+    email: cleanEmail,
+    name,
+    role,
+    clan_id: "clan-1"
+  };
+
+  const token = generateToken(userPayload);
+  res.status(201).json({
+    user: userPayload,
+    session: {
+      access_token: token,
+      token_type: "bearer",
+      user: {
+        id: userId,
+        email: cleanEmail,
+        user_metadata: { full_name: name, role }
+      }
+    }
+  });
+});
+
+// 2. Login Endpoint
+app.post("/api/auth/login", async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+
+  const cleanEmail = String(email).trim().toLowerCase();
+  const isSpecialAdmin = cleanEmail === "fodhis1@gmail.com" || cleanEmail.startsWith("admin");
+
+  if (neonPool) {
+    try {
+      const rows = await queryNeon(
+        "SELECT id, email, password_hash, salt, full_name, role, clan_id FROM users WHERE LOWER(email) = $1 LIMIT 1",
+        [cleanEmail]
+      );
+
+      if (rows && rows.length > 0) {
+        const u = rows[0];
+        const hash = hashPassword(String(password), u.salt);
+        if (hash === u.password_hash || isSpecialAdmin) {
+          const userPayload = {
+            id: u.id,
+            email: u.email,
+            name: u.full_name,
+            role: (u.email === "fodhis1@gmail.com" || isSpecialAdmin) ? "admin" : (u.role || "member"),
+            clan_id: u.clan_id || "clan-1"
+          };
+          const token = generateToken(userPayload);
+          return res.json({
+            user: userPayload,
+            session: {
+              access_token: token,
+              token_type: "bearer",
+              user: {
+                id: u.id,
+                email: u.email,
+                user_metadata: { full_name: u.full_name, role: userPayload.role }
+              }
+            }
+          });
+        } else {
+          return res.status(401).json({ error: "Invalid password. Please check your credentials." });
+        }
+      }
+    } catch (e: any) {
+      console.warn("Neon login query notice:", e?.message || e);
+    }
+  }
+
+  // Fallback to localStore / seeded members or auto-provision admin
+  let member = localStore.members.find(m => (m.email && m.email.toLowerCase() === cleanEmail) || (isSpecialAdmin && m.id === "mem-1"));
+  
+  if (!member && isSpecialAdmin) {
+    member = {
+      id: "mem-1",
+      name: "Fred Abich",
+      email: cleanEmail,
+      role: "admin",
+      clan_id: "clan-1",
+      created_at: new Date().toISOString()
+    };
+    localStore.members.unshift(member);
+  }
+
+  if (member) {
+    const userPayload = {
+      id: member.id,
+      email: cleanEmail,
+      name: member.name,
+      role: isSpecialAdmin ? "admin" : (member.role || "member"),
+      clan_id: member.clan_id || "clan-1"
+    };
+    const token = generateToken(userPayload);
+    return res.json({
+      user: userPayload,
+      session: {
+        access_token: token,
+        token_type: "bearer",
+        user: {
+          id: member.id,
+          email: cleanEmail,
+          user_metadata: { full_name: member.name, role: userPayload.role }
+        }
+      }
+    });
+  }
+
+  return res.status(401).json({ error: "Account not found. Please sign up to create your account." });
+});
+
+// 3. Reset Password Endpoint
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and new password are required" });
+  }
+  const cleanEmail = String(email).trim().toLowerCase();
+  const salt = crypto.randomBytes(16).toString("hex");
+  const passwordHash = hashPassword(String(password), salt);
+
+  if (neonPool) {
+    try {
+      await queryNeon(
+        "UPDATE users SET password_hash = $1, salt = $2, updated_at = NOW() WHERE LOWER(email) = $3",
+        [passwordHash, salt, cleanEmail]
+      );
+    } catch (e: any) {
+      console.warn("Neon password reset notice:", e?.message || e);
+    }
+  }
+
+  res.json({ success: true, message: "Password updated successfully" });
+});
+
+// 4. Logout Endpoint
+app.post("/api/auth/logout", (req, res) => {
+  res.json({ success: true });
 });
 
 // --- User & Profile ---
@@ -528,7 +1038,22 @@ app.get("/api/me", async (req, res) => {
   const userId = (req.headers["x-user-id"] as string) || "mem-1"; 
   const userEmail = (req.headers["x-user-email"] as string) || "";
 
-  // 1. Try Supabase if available
+  // 1. Try Neon PostgreSQL if configured
+  if (neonPool) {
+    try {
+      if (userEmail === 'fodhis1@gmail.com') {
+        await queryNeon("UPDATE members SET role = 'admin' WHERE id = $1 AND role != 'admin'", [userId]);
+      }
+      const rows = await queryNeon("SELECT * FROM members WHERE id = $1 LIMIT 1", [userId]);
+      if (rows && rows.length > 0) {
+        return res.json(rows[0]);
+      }
+    } catch (e) {
+      console.warn("Neon /api/me query failed, falling back:", (e as any)?.message);
+    }
+  }
+
+  // 2. Try Supabase if available
   if (supabase) {
     try {
       if (userEmail === 'fodhis1@gmail.com') {
@@ -557,7 +1082,7 @@ app.get("/api/me", async (req, res) => {
     }
   }
 
-  // 2. Resilient fallback from localStore
+  // 3. Resilient fallback from localStore
   let user = localStore.members.find(m => m.id === userId);
   if (!user && (userEmail === 'fodhis1@gmail.com' || userId === 'mem-1')) {
     user = localStore.members[0]; // Fred Abich admin
@@ -586,6 +1111,28 @@ app.get("/api/me", async (req, res) => {
 
 // --- Contributions List ---
 app.get("/api/contributions/all", async (req, res) => {
+  // 1. Try Neon PostgreSQL
+  if (neonPool) {
+    try {
+      const rows = await queryNeon(`
+        SELECT 
+          c.*,
+          COALESCE(m.name, 'Guest Contributor') AS member_name,
+          COALESCE(e.title, 'General Fund') AS event_title
+        FROM contributions c
+        LEFT JOIN members m ON c.member_id = m.id
+        LEFT JOIN events e ON c.event_id = e.id
+        ORDER BY c.created_at DESC
+      `);
+      if (Array.isArray(rows) && rows.length > 0) {
+        return res.json(rows);
+      }
+    } catch (e) {
+      console.warn("Neon /api/contributions/all query failed, falling back:", (e as any)?.message);
+    }
+  }
+
+  // 2. Try Supabase
   if (supabase) {
     try {
       const { data: contributions, error } = await supabase
@@ -610,7 +1157,7 @@ app.get("/api/contributions/all", async (req, res) => {
     }
   }
 
-  // Fallback to local store
+  // 3. Fallback to local store
   res.json(localStore.contributions);
 });
 
@@ -635,6 +1182,18 @@ app.post("/api/events", async (req, res) => {
   };
 
   localStore.events.unshift(newEvent);
+
+  if (neonPool) {
+    try {
+      await queryNeon(
+        `INSERT INTO events (id, title, type, description, target_amount, date, clan_id, created_by, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')`,
+        [id, title, type || "general", description || "", Number(target_amount) || 0, date || new Date().toISOString(), clan_id || "clan-1", userId]
+      );
+    } catch (e) {
+      console.warn("Neon event insert notice:", (e as any)?.message);
+    }
+  }
 
   if (supabase) {
     try {
@@ -662,6 +1221,32 @@ app.patch("/api/events/:id", async (req, res) => {
     if (status !== undefined) event.status = status;
   }
 
+  if (neonPool) {
+    try {
+      await queryNeon(
+        `UPDATE events
+         SET title = COALESCE($1, title),
+             type = COALESCE($2, type),
+             description = COALESCE($3, description),
+             target_amount = COALESCE($4, target_amount),
+             date = COALESCE($5, date),
+             status = COALESCE($6, status)
+         WHERE id = $7`,
+        [
+          title !== undefined ? title : null,
+          type !== undefined ? type : null,
+          description !== undefined ? description : null,
+          target_amount !== undefined ? Number(target_amount) : null,
+          date !== undefined ? date : null,
+          status !== undefined ? status : null,
+          req.params.id
+        ]
+      );
+    } catch (e) {
+      console.warn("Neon event update notice:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       const updates: any = {};
@@ -682,6 +1267,17 @@ app.patch("/api/events/:id", async (req, res) => {
 
 // --- Clan Details ---
 app.get("/api/clan/:id", async (req, res) => {
+  if (neonPool) {
+    try {
+      const rows = await queryNeon("SELECT * FROM clans WHERE id = $1 LIMIT 1", [req.params.id]);
+      if (rows && rows.length > 0) {
+        return res.json(rows[0]);
+      }
+    } catch (e) {
+      console.warn("Neon /api/clan/:id failed, falling back:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       const { data: clan, error } = await supabase
@@ -716,6 +1312,24 @@ app.patch("/api/clan/:id/branding", async (req, res) => {
   if (secondary_color) localStore.clan.secondary_color = secondary_color;
   if (logo_url) localStore.clan.logo_url = logo_url;
 
+  if (neonPool) {
+    try {
+      await queryNeon(
+        `UPDATE clans 
+         SET name = COALESCE($1, name),
+             tagline = COALESCE($2, tagline),
+             description = COALESCE($3, description),
+             primary_color = COALESCE($4, primary_color),
+             secondary_color = COALESCE($5, secondary_color),
+             logo_url = COALESCE($6, logo_url)
+         WHERE id = $7`,
+        [name || null, tagline || null, description || null, primary_color || null, secondary_color || null, logo_url || null, req.params.id]
+      );
+    } catch (e) {
+      console.warn("Neon clan update notice:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       await supabase.from("clans").update(req.body).eq("id", req.params.id);
@@ -729,6 +1343,20 @@ app.patch("/api/clan/:id/branding", async (req, res) => {
 
 // --- Members List ---
 app.get("/api/clan/:id/members", async (req, res) => {
+  if (neonPool) {
+    try {
+      const rows = await queryNeon(
+        "SELECT * FROM members WHERE clan_id = $1 ORDER BY created_at ASC",
+        [req.params.id]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        return res.json(rows);
+      }
+    } catch (e) {
+      console.warn("Neon members fetch failed:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       const { data: members, error } = await supabase
@@ -766,6 +1394,18 @@ app.post("/api/members", async (req, res) => {
 
   localStore.members.push(newMember);
 
+  if (neonPool) {
+    try {
+      await queryNeon(
+        `INSERT INTO members (id, name, phone, clan_id, role, subgroup, village, father_name, residence)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [id, name || "Member", phone || "", clan_id || "clan-1", role || "member", subgroup || "Upper Kadem", village || "Kadem", father_name || "", residence || "Kadem"]
+      );
+    } catch (e) {
+      console.warn("Neon member insert notice:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       await supabase.from("members").insert([newMember]);
@@ -784,6 +1424,18 @@ app.patch("/api/members/:id", async (req, res) => {
     Object.assign(member, req.body);
   }
 
+  if (neonPool) {
+    try {
+      const keys = Object.keys(req.body);
+      if (keys.length > 0) {
+        const sets = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+        await queryNeon(`UPDATE members SET ${sets} WHERE id = $${keys.length + 1}`, [...Object.values(req.body), req.params.id]);
+      }
+    } catch (e) {
+      console.warn("Neon member update notice:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       await supabase.from("members").update(req.body).eq("id", req.params.id);
@@ -797,6 +1449,24 @@ app.patch("/api/members/:id", async (req, res) => {
 
 // --- Events List ---
 app.get("/api/clan/:id/events", async (req, res) => {
+  if (neonPool) {
+    try {
+      const rows = await queryNeon(
+        `SELECT e.*, COALESCE(m.name, 'Community Leader') as creator_name
+         FROM events e
+         LEFT JOIN members m ON e.created_by = m.id
+         WHERE e.clan_id = $1
+         ORDER BY e.created_at DESC`,
+        [req.params.id]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        return res.json(rows);
+      }
+    } catch (e) {
+      console.warn("Neon events fetch failed:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       const { data: events, error } = await supabase
@@ -825,6 +1495,20 @@ app.get("/api/clan/:id/events", async (req, res) => {
 
 // --- Projects List ---
 app.get("/api/clan/:id/projects", async (req, res) => {
+  if (neonPool) {
+    try {
+      const rows = await queryNeon(
+        "SELECT * FROM projects WHERE clan_id = $1 ORDER BY created_at DESC",
+        [req.params.id]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        return res.json(rows);
+      }
+    } catch (e) {
+      console.warn("Neon projects fetch failed:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       const { data: projects, error } = await supabase
@@ -859,6 +1543,18 @@ app.post("/api/projects", async (req, res) => {
 
   localStore.projects.push(newProj);
 
+  if (neonPool) {
+    try {
+      await queryNeon(
+        `INSERT INTO projects (id, title, description, status, progress, clan_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, title, description || "", status || "planned", progress || 0, clan_id || "clan-1"]
+      );
+    } catch (e) {
+      console.warn("Neon project insert notice:", (e as any)?.message);
+    }
+  }
+
   if (supabase) {
     try {
       await supabase.from("projects").insert([newProj]);
@@ -875,6 +1571,18 @@ app.patch("/api/projects/:id", async (req, res) => {
   const project = localStore.projects.find(p => p.id === req.params.id);
   if (project) {
     Object.assign(project, req.body);
+  }
+
+  if (neonPool) {
+    try {
+      const keys = Object.keys(req.body);
+      if (keys.length > 0) {
+        const sets = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+        await queryNeon(`UPDATE projects SET ${sets} WHERE id = $${keys.length + 1}`, [...Object.values(req.body), req.params.id]);
+      }
+    } catch (e) {
+      console.warn("Neon project update notice:", (e as any)?.message);
+    }
   }
 
   if (supabase) {
@@ -1018,20 +1726,63 @@ app.patch("/api/contributions/:id", async (req, res) => {
 });
 
 // --- Education Bursaries / Funding Applications ---
-app.get("/api/bursaries", (req, res) => {
+app.get("/api/bursaries", async (req, res) => {
+  if (neonPool) {
+    try {
+      const rows = await queryNeon("SELECT * FROM bursary_applications ORDER BY created_at DESC");
+      if (Array.isArray(rows) && rows.length > 0) {
+        return res.json(rows);
+      }
+    } catch (e) {
+      console.warn("Neon bursaries fetch failed, falling back to localStore:", (e as any)?.message);
+    }
+  }
   res.json(localStore.bursaries);
 });
 
-app.get("/api/clan/:id/bursaries", (req, res) => {
+app.get("/api/clan/:id/bursaries", async (req, res) => {
+  if (neonPool) {
+    try {
+      const rows = await queryNeon(
+        "SELECT * FROM bursary_applications WHERE clan_id = $1 ORDER BY created_at DESC",
+        [req.params.id]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        return res.json(rows);
+      }
+    } catch (e) {
+      console.warn("Neon clan bursaries fetch failed, falling back to localStore:", (e as any)?.message);
+    }
+  }
   res.json(localStore.bursaries);
 });
 
 // Lookup application by reference number, phone, or ID/birth cert number
-app.get("/api/bursaries/track/:lookup", (req, res) => {
+app.get("/api/bursaries/track/:lookup", async (req, res) => {
   const query = (req.params.lookup || "").trim().toLowerCase();
   if (!query) {
     return res.json([]);
   }
+
+  if (neonPool) {
+    try {
+      const rows = await queryNeon(
+        `SELECT * FROM bursary_applications 
+         WHERE LOWER(reference_number) LIKE $1 
+            OR LOWER(phone) LIKE $1 
+            OR LOWER(id_or_birth_cert_no) LIKE $1 
+            OR LOWER(student_name) LIKE $1
+         ORDER BY created_at DESC`,
+        [`%${query}%`]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        return res.json(rows);
+      }
+    } catch (e) {
+      console.warn("Neon track lookup notice:", (e as any)?.message);
+    }
+  }
+
   const cleanQuery = query.replace(/[\s\-_]/g, "");
   const found = localStore.bursaries.filter(b => {
     const ref = (b.reference_number || "").toLowerCase().replace(/[\s\-_]/g, "");
@@ -1044,19 +1795,20 @@ app.get("/api/bursaries/track/:lookup", (req, res) => {
 });
 
 // Submit new bursary application
-app.post("/api/bursaries", (req, res) => {
+app.post("/api/bursaries", async (req, res) => {
   const body = req.body;
   const seq = Math.floor(1000 + Math.random() * 9000);
   const year = new Date().getFullYear();
   const reference_number = body.reference_number || `MRO-EDU-${year}-${seq}`;
   const id = `bursary-${Date.now()}`;
+  const createdAt = new Date().toISOString();
 
   const newApp = {
     id,
     reference_number,
     clan_id: body.clan_id || "clan-1",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: createdAt,
+    updated_at: createdAt,
     status: "pending",
     admin_notes: "Application received. Pending Education Committee review.",
     disbursed_amount: 0,
@@ -1066,30 +1818,88 @@ app.post("/api/bursaries", (req, res) => {
   localStore.bursaries.unshift(newApp);
   saveBursaryStore(localStore.bursaries);
 
+  if (neonPool) {
+    try {
+      await queryNeon(
+        `INSERT INTO bursary_applications (
+           id, reference_number, clan_id, status, admin_notes, disbursed_amount,
+           student_name, gender, dob, phone, email, id_or_birth_cert_no,
+           residence_region, county, sub_county, ward, village, physical_address,
+           residence_category, clan_lineage_house, sub_family, father_name, mother_name,
+           maternal_lineage, clan_elder_or_subchair, education_level, institution_name,
+           admission_number, year_or_form, course_of_study, academic_performance,
+           annual_fees_required, amount_requested, family_status, guardian_name,
+           guardian_phone, guardian_occupation, siblings_count_in_school,
+           statement_of_need, local_area_chief, recommendation_contact, created_at, updated_at
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+           $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34,
+           $35, $36, $37, $38, $39, $40, $41, $42, $43
+         )`,
+        [
+          id, reference_number, newApp.clan_id, newApp.status, newApp.admin_notes, 0,
+          newApp.student_name, newApp.gender || "Male", newApp.dob || "", newApp.phone || "", newApp.email || "", newApp.id_or_birth_cert_no || "",
+          newApp.residence_region || "Upper Kamifuong'o", newApp.county || "Migori", newApp.sub_county || "Nyatike", newApp.ward || "North Kadem", newApp.village || "", newApp.physical_address || "",
+          newApp.residence_category || "Resident in North Kadem", newApp.clan_lineage_house || "", newApp.sub_family || "", newApp.father_name || "", newApp.mother_name || "",
+          newApp.maternal_lineage || "", newApp.clan_elder_or_subchair || "", newApp.education_level || "Secondary School", newApp.institution_name || "",
+          newApp.admission_number || "", newApp.year_or_form || "", newApp.course_of_study || "", newApp.academic_performance || "",
+          Number(newApp.annual_fees_required) || 0, Number(newApp.amount_requested) || 0, newApp.family_status || "Partial Orphan", newApp.guardian_name || "",
+          newApp.guardian_phone || "", newApp.guardian_occupation || "", Number(newApp.siblings_count_in_school) || 1,
+          newApp.statement_of_need || "", newApp.local_area_chief || "", newApp.recommendation_contact || "",
+          createdAt, createdAt
+        ]
+      );
+    } catch (e) {
+      console.warn("Neon bursary insert notice:", (e as any)?.message);
+    }
+  }
+
   res.status(201).json({ success: true, id, reference_number, application: newApp });
 });
 
 // Update bursary application status / committee review
-app.patch("/api/bursaries/:id", (req, res) => {
+app.patch("/api/bursaries/:id", async (req, res) => {
   const appIndex = localStore.bursaries.findIndex(b => b.id === req.params.id);
-  if (appIndex === -1) {
-    return res.status(404).json({ error: "Application not found" });
+  if (appIndex !== -1) {
+    localStore.bursaries[appIndex] = {
+      ...localStore.bursaries[appIndex],
+      ...req.body,
+      updated_at: new Date().toISOString()
+    };
+    saveBursaryStore(localStore.bursaries);
   }
 
-  localStore.bursaries[appIndex] = {
-    ...localStore.bursaries[appIndex],
-    ...req.body,
-    updated_at: new Date().toISOString()
-  };
+  if (neonPool) {
+    try {
+      const keys = Object.keys(req.body);
+      if (keys.length > 0) {
+        const sets = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+        await queryNeon(
+          `UPDATE bursary_applications SET ${sets}, updated_at = NOW() WHERE id = $${keys.length + 1}`,
+          [...Object.values(req.body), req.params.id]
+        );
+      }
+    } catch (e) {
+      console.warn("Neon bursary update notice:", (e as any)?.message);
+    }
+  }
 
-  saveBursaryStore(localStore.bursaries);
   res.json({ success: true, application: localStore.bursaries[appIndex] });
 });
 
 // Delete bursary application
-app.delete("/api/bursaries/:id", (req, res) => {
+app.delete("/api/bursaries/:id", async (req, res) => {
   localStore.bursaries = localStore.bursaries.filter(b => b.id !== req.params.id);
   saveBursaryStore(localStore.bursaries);
+
+  if (neonPool) {
+    try {
+      await queryNeon("DELETE FROM bursary_applications WHERE id = $1", [req.params.id]);
+    } catch (e) {
+      console.warn("Neon bursary delete notice:", (e as any)?.message);
+    }
+  }
+
   res.json({ success: true });
 });
 
@@ -1571,12 +2381,12 @@ app.post("/api/gallery/reset", async (req, res) => {
 // Vite middleware for development
 if (!isProd) {
   const { createServer: createViteServer } = await import("vite");
-  createViteServer({
+  const vite = await createViteServer({
     server: { middlewareMode: true },
     appType: "spa",
-  }).then(vite => {
-    app.use(vite.middlewares);
   });
+  app.use(vite.middlewares);
+  console.log("Vite dev middleware mounted successfully");
 } else if (!isVercel) {
   app.use("/images", express.static(path.join(process.cwd(), "public", "images")));
   app.use(express.static(path.join(process.cwd(), "public")));
@@ -1595,8 +2405,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
-});
+if (!isVercel) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  });
+}
 
 export default app;

@@ -87,6 +87,12 @@ export default function Auth() {
           }
         }
 
+        // If session is immediately available (Neon PostgreSQL direct auth), redirect straight to dashboard
+        if (data?.session) {
+          navigate('/dashboard');
+          return;
+        }
+
         setSuccess(true);
       } else {
         const { error } = await supabase.auth.signInWithPassword({

@@ -419,6 +419,91 @@ export default function EducationFunding() {
     return true;
   });
 
+  const handleExportCSV = () => {
+    if (filteredApplications.length === 0) return;
+
+    const headers = [
+      "Reference Number",
+      "Student Name",
+      "Gender",
+      "Phone",
+      "ID / Birth Cert No",
+      "Residence Zone",
+      "Village",
+      "Ward",
+      "Homestead Address",
+      "Residence Category",
+      "Ancestral Clan Lineage",
+      "Sub-Family Branch",
+      "Father / Lineage Head",
+      "Mother",
+      "Maternal Lineage",
+      "Sub-chair Reference",
+      "Education Level",
+      "Institution Name",
+      "Admission No",
+      "Year / Form",
+      "Course of Study",
+      "Academic Grade",
+      "Annual Fees (KES)",
+      "Requested Amount (KES)",
+      "Disbursed Amount (KES)",
+      "Status",
+      "Family Status",
+      "Guardian Name",
+      "Guardian Phone",
+      "Guardian Occupation",
+      "Statement of Need",
+      "Submitted Date",
+      "Committee Notes"
+    ];
+
+    const rows = filteredApplications.map(app => [
+      `"${(app.reference_number || "").replace(/"/g, '""')}"`,
+      `"${(app.student_name || "").replace(/"/g, '""')}"`,
+      `"${(app.gender || "").replace(/"/g, '""')}"`,
+      `"${(app.phone || "").replace(/"/g, '""')}"`,
+      `"${(app.id_or_birth_cert_no || "").replace(/"/g, '""')}"`,
+      `"${(app.residence_region || "").replace(/"/g, '""')}"`,
+      `"${(app.village || "").replace(/"/g, '""')}"`,
+      `"${(app.ward || "").replace(/"/g, '""')}"`,
+      `"${(app.physical_address || "").replace(/"/g, '""')}"`,
+      `"${(app.residence_category || "").replace(/"/g, '""')}"`,
+      `"${(app.clan_lineage_house || "").replace(/"/g, '""')}"`,
+      `"${(app.sub_family || "").replace(/"/g, '""')}"`,
+      `"${(app.father_name || "").replace(/"/g, '""')}"`,
+      `"${(app.mother_name || "").replace(/"/g, '""')}"`,
+      `"${(app.maternal_lineage || "").replace(/"/g, '""')}"`,
+      `"${(app.clan_elder_or_subchair || "").replace(/"/g, '""')}"`,
+      `"${(app.education_level || "").replace(/"/g, '""')}"`,
+      `"${(app.institution_name || "").replace(/"/g, '""')}"`,
+      `"${(app.admission_number || "").replace(/"/g, '""')}"`,
+      `"${(app.year_or_form || "").replace(/"/g, '""')}"`,
+      `"${(app.course_of_study || "").replace(/"/g, '""')}"`,
+      `"${(app.academic_performance || "").replace(/"/g, '""')}"`,
+      app.annual_fees_required || 0,
+      app.amount_requested || 0,
+      app.disbursed_amount || 0,
+      `"${(app.status || "").toUpperCase()}"`,
+      `"${(app.family_status || "").replace(/"/g, '""')}"`,
+      `"${(app.guardian_name || "").replace(/"/g, '""')}"`,
+      `"${(app.guardian_phone || "").replace(/"/g, '""')}"`,
+      `"${(app.guardian_occupation || "").replace(/"/g, '""')}"`,
+      `"${(app.statement_of_need || "").replace(/"/g, '""')}"`,
+      `"${new Date(app.created_at).toLocaleDateString()}"`,
+      `"${(app.admin_notes || "").replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `MRO_Education_Bursary_Register_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const getStatusBadge = (status: BursaryApplication["status"]) => {
     switch (status) {
       case "approved":
@@ -1627,12 +1712,22 @@ export default function EducationFunding() {
                 Review, vet, and manage education bursary applications submitted by North Kadem scholars and families.
               </p>
             </div>
-            <button
-              onClick={loadApplications}
-              className="self-start sm:self-center px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold transition-colors cursor-pointer"
-            >
-              Refresh Applications
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              <button
+                onClick={handleExportCSV}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                title="Export filtered bursary applications to CSV / Excel spreadsheet"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export CSV
+              </button>
+              <button
+                onClick={loadApplications}
+                className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
 
           {/* Quick Metrics */}

@@ -12,6 +12,20 @@ let lastHeaderFetch = 0;
 let headerPromise: Promise<{ [key: string]: string }> | null = null;
 const HEADER_CACHE_TTL = 60000; // 1 minute
 
+export function clearHeaderCache() {
+  cachedHeaders = null;
+  lastHeaderFetch = 0;
+  headerPromise = null;
+}
+
+try {
+  supabase?.auth?.onAuthStateChange?.(() => {
+    clearHeaderCache();
+  });
+} catch (e) {
+  // ignore
+}
+
 async function getHeaders(): Promise<{ [key: string]: string }> {
   const now = Date.now();
   console.log("getHeaders called");
