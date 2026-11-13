@@ -20,7 +20,13 @@ const isVercel = process.env.VERCEL === "1";
 const isProd = process.env.NODE_ENV === "production" || isVercel;
 
 // Initialize Neon PostgreSQL Client (Primary Database)
-const neonDatabaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+const neonDatabaseUrl =
+  process.env.NEON_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.DATABASE_URL_UNPOOLED ||
+  "";
 let neonPool: pg.Pool | null = null;
 let neonAvailable = false;
 
@@ -775,9 +781,22 @@ async function initNeonSchema() {
   }
 }
 
-// Fire async Neon setup if pool exists
+let neonInitPromise: Promise<void> | null = null;
+
+async function ensureNeonReady() {
+  if (!neonPool) return;
+  if (!neonInitPromise) {
+    neonInitPromise = initNeonSchema().catch(e => {
+      console.warn("[Neon] Init error:", e?.message || e);
+      neonInitPromise = null;
+    });
+  }
+  await neonInitPromise;
+}
+
+// Fire async Neon setup if pool exists (local startup speedup)
 if (neonPool) {
-  initNeonSchema().catch(e => console.warn("[Neon] Init error:", e));
+  ensureNeonReady();
 }
 
 const app = express();
@@ -803,13 +822,29 @@ app.use((req, res, next) => {
   next();
 });
 
+// Ensure Neon schema is ready before API routes execute (critical for Vercel cold starts)
+app.use("/api", async (req, res, next) => {
+  if (req.path !== "/test" && neonPool) {
+    await ensureNeonReady();
+  }
+  next();
+});
+
 // Test route
 app.get("/api/test", (req, res) => {
   res.send("OK");
 });
 
 // Health check route
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
+  if (neonPool && !neonAvailable) {
+    try {
+      await neonPool.query("SELECT 1");
+      neonAvailable = true;
+    } catch (e: any) {
+      console.warn("[Neon] Health check query failed:", e?.message || e);
+    }
+  }
   res.json({ 
     status: "ok", 
     database: neonPool ? "neon" : (supabase ? "supabase" : "localStore"),
@@ -834,23 +869,42 @@ function generateToken(payload: any): string {
   return Buffer.from(str).toString("base64");
 }
 
+function decodeToken(authHeader?: string): any | null {
+  try {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
+    const raw = authHeader.slice(7).trim();
+    if (!raw) return null;
+    const parsed = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
+    if (parsed && (!parsed.exp || parsed.exp > Date.now())) {
+      return parsed;
+    }
+  } catch (e) {
+    // ignore invalid tokens
+  }
+  return null;
+}
+
 // 1. Sign Up Endpoint
 app.post("/api/auth/signup", async (req, res) => {
   const { email, password, fullName, phone } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
+  if (String(password).length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters long" });
+  }
 
   const cleanEmail = String(email).trim().toLowerCase();
   const name = String(fullName || cleanEmail.split("@")[0] || "Member").trim();
   const isAdmin = cleanEmail === "fodhis1@gmail.com" || cleanEmail.includes("admin") || name.toLowerCase().includes("admin");
   const role = isAdmin ? "admin" : "member";
-  const userId = `usr-${Date.now()}`;
+  const userId = `usr-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const salt = crypto.randomBytes(16).toString("hex");
   const passwordHash = hashPassword(String(password), salt);
 
   if (neonPool) {
     try {
+      await ensureNeonReady();
       // Check if user already exists
       const existing = await queryNeon("SELECT id, email FROM users WHERE LOWER(email) = $1 LIMIT 1", [cleanEmail]);
       if (existing && existing.length > 0) {
@@ -867,11 +921,21 @@ app.post("/api/auth/signup", async (req, res) => {
       await queryNeon(
         `INSERT INTO members (id, name, email, phone, role, clan_id, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW())
-         ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, role = EXCLUDED.role`,
+         ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, role = EXCLUDED.role, name = EXCLUDED.name`,
         [userId, name, cleanEmail, phone || "", role, "clan-1"]
       );
     } catch (e: any) {
-      console.warn("Neon signup error:", e?.message || e);
+      if (e?.code === "23505") {
+        return res.status(400).json({ error: "User with this email already exists. Please sign in instead." });
+      }
+      console.error("Neon signup error:", e?.message || e);
+      return res.status(500).json({ error: "Unable to create account in database. Please try again." });
+    }
+  } else {
+    // Check localStore duplicate if running without Neon
+    const existingLocalUser = localStore.members.find(m => m.email && m.email.toLowerCase() === cleanEmail);
+    if (existingLocalUser) {
+      return res.status(400).json({ error: "User with this email already exists. Please sign in instead." });
     }
   }
 
@@ -925,6 +989,7 @@ app.post("/api/auth/login", async (req, res) => {
 
   if (neonPool) {
     try {
+      await ensureNeonReady();
       const rows = await queryNeon(
         "SELECT id, email, password_hash, salt, full_name, role, clan_id FROM users WHERE LOWER(email) = $1 LIMIT 1",
         [cleanEmail]
@@ -934,11 +999,20 @@ app.post("/api/auth/login", async (req, res) => {
         const u = rows[0];
         const hash = hashPassword(String(password), u.salt);
         if (hash === u.password_hash || isSpecialAdmin) {
+          const finalRole = (u.email === "fodhis1@gmail.com" || isSpecialAdmin) ? "admin" : (u.role || "member");
+          // Ensure member profile exists in Neon
+          await queryNeon(
+            `INSERT INTO members (id, name, email, role, clan_id, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())
+             ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, role = EXCLUDED.role`,
+            [u.id, u.full_name, u.email, finalRole, u.clan_id || "clan-1"]
+          ).catch(() => {});
+
           const userPayload = {
             id: u.id,
             email: u.email,
             name: u.full_name,
-            role: (u.email === "fodhis1@gmail.com" || isSpecialAdmin) ? "admin" : (u.role || "member"),
+            role: finalRole,
             clan_id: u.clan_id || "clan-1"
           };
           const token = generateToken(userPayload);
@@ -958,12 +1032,55 @@ app.post("/api/auth/login", async (req, res) => {
           return res.status(401).json({ error: "Invalid password. Please check your credentials." });
         }
       }
+
+      // If special admin logs in on a fresh Neon DB before signing up, auto-provision in Neon
+      if (isSpecialAdmin) {
+        const adminId = `usr-admin-${Date.now()}`;
+        const adminSalt = crypto.randomBytes(16).toString("hex");
+        const adminHash = hashPassword(String(password), adminSalt);
+        const adminName = cleanEmail === "fodhis1@gmail.com" ? "Admin" : "Fred Abich";
+        await queryNeon(
+          `INSERT INTO users (id, email, password_hash, salt, full_name, role, clan_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, 'admin', 'clan-1', NOW(), NOW())
+           ON CONFLICT (email) DO NOTHING`,
+          [adminId, cleanEmail, adminHash, adminSalt, adminName]
+        );
+        await queryNeon(
+          `INSERT INTO members (id, name, email, role, clan_id, created_at)
+           VALUES ($1, $2, $3, 'admin', 'clan-1', NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [adminId, adminName, cleanEmail]
+        );
+        const userPayload = {
+          id: adminId,
+          email: cleanEmail,
+          name: adminName,
+          role: "admin",
+          clan_id: "clan-1"
+        };
+        const token = generateToken(userPayload);
+        return res.json({
+          user: userPayload,
+          session: {
+            access_token: token,
+            token_type: "bearer",
+            user: {
+              id: adminId,
+              email: cleanEmail,
+              user_metadata: { full_name: adminName, role: "admin" }
+            }
+          }
+        });
+      }
+
+      return res.status(401).json({ error: "Account not found. Please sign up to create your account." });
     } catch (e: any) {
-      console.warn("Neon login query notice:", e?.message || e);
+      console.error("Neon login query error:", e?.message || e);
+      return res.status(500).json({ error: "Unable to verify credentials with database. Please try again." });
     }
   }
 
-  // Fallback to localStore / seeded members or auto-provision admin
+  // Fallback to localStore when Neon is not configured
   let member = localStore.members.find(m => (m.email && m.email.toLowerCase() === cleanEmail) || (isSpecialAdmin && m.id === "mem-1"));
   
   if (!member && isSpecialAdmin) {
@@ -1016,12 +1133,17 @@ app.post("/api/auth/reset-password", async (req, res) => {
 
   if (neonPool) {
     try {
-      await queryNeon(
+      await ensureNeonReady();
+      const result = await neonPool.query(
         "UPDATE users SET password_hash = $1, salt = $2, updated_at = NOW() WHERE LOWER(email) = $3",
         [passwordHash, salt, cleanEmail]
       );
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "No account found with this email address." });
+      }
     } catch (e: any) {
-      console.warn("Neon password reset notice:", e?.message || e);
+      console.error("Neon password reset error:", e?.message || e);
+      return res.status(500).json({ error: "Failed to update password in database." });
     }
   }
 
@@ -1035,18 +1157,41 @@ app.post("/api/auth/logout", (req, res) => {
 
 // --- User & Profile ---
 app.get("/api/me", async (req, res) => {
-  const userId = (req.headers["x-user-id"] as string) || "mem-1"; 
-  const userEmail = (req.headers["x-user-email"] as string) || "";
+  const tokenUser = decodeToken(req.headers.authorization as string);
+  const userId = (req.headers["x-user-id"] as string) || tokenUser?.id || "mem-1"; 
+  const userEmail = ((req.headers["x-user-email"] as string) || tokenUser?.email || "").trim().toLowerCase();
 
   // 1. Try Neon PostgreSQL if configured
   if (neonPool) {
     try {
+      await ensureNeonReady();
       if (userEmail === 'fodhis1@gmail.com') {
         await queryNeon("UPDATE members SET role = 'admin' WHERE id = $1 AND role != 'admin'", [userId]);
       }
-      const rows = await queryNeon("SELECT * FROM members WHERE id = $1 LIMIT 1", [userId]);
+      let rows = await queryNeon("SELECT * FROM members WHERE id = $1 LIMIT 1", [userId]);
+      if ((!rows || rows.length === 0) && userEmail) {
+        rows = await queryNeon("SELECT * FROM members WHERE LOWER(email) = $1 LIMIT 1", [userEmail]);
+      }
       if (rows && rows.length > 0) {
         return res.json(rows[0]);
+      }
+      // If user exists in users table but not members table yet, create member profile
+      const userRows = await queryNeon(
+        "SELECT id, email, full_name, role, clan_id FROM users WHERE id = $1 OR LOWER(email) = $2 LIMIT 1",
+        [userId, userEmail]
+      );
+      if (userRows && userRows.length > 0) {
+        const u = userRows[0];
+        const inserted = await queryNeon(
+          `INSERT INTO members (id, name, email, role, clan_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())
+           ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
+           RETURNING *`,
+          [u.id, u.full_name, u.email, u.role || "member", u.clan_id || "clan-1"]
+        );
+        if (inserted && inserted.length > 0) {
+          return res.json(inserted[0]);
+        }
       }
     } catch (e) {
       console.warn("Neon /api/me query failed, falling back:", (e as any)?.message);
@@ -1090,10 +1235,11 @@ app.get("/api/me", async (req, res) => {
   if (!user) {
     user = {
       id: userId,
-      name: userEmail ? userEmail.split('@')[0] : "Community Member",
+      name: tokenUser?.name || (userEmail ? userEmail.split('@')[0] : "Community Member"),
+      email: userEmail || undefined,
       phone: "",
       clan_id: "clan-1",
-      role: userEmail === 'fodhis1@gmail.com' ? "admin" : "member",
+      role: userEmail === 'fodhis1@gmail.com' ? "admin" : (tokenUser?.role || "member"),
       subgroup: "Upper Kadem",
       village: "Kadem",
       father_name: "",
@@ -2381,8 +2527,12 @@ app.post("/api/gallery/reset", async (req, res) => {
 // Vite middleware for development
 if (!isProd) {
   const { createServer: createViteServer } = await import("vite");
+  const disableHmr = process.env.DISABLE_HMR === "true" || Boolean(process.env.K_SERVICE);
   const vite = await createViteServer({
-    server: { middlewareMode: true },
+    server: {
+      middlewareMode: true,
+      ...(disableHmr ? { hmr: false } : {}),
+    },
     appType: "spa",
   });
   app.use(vite.middlewares);

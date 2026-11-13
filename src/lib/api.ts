@@ -63,13 +63,17 @@ async function getHeaders(): Promise<{ [key: string]: string }> {
       }
 
       const userId = session?.user?.id || "mem-1";
+      const token = session?.access_token || "";
       console.log("Session found, userId:", userId);
       
-      const headers = {
+      const headers: { [key: string]: string } = {
         "Content-Type": "application/json",
         "x-user-id": userId,
         "x-user-email": session?.user?.email || ""
       };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       
       cachedHeaders = headers;
       lastHeaderFetch = Date.now();

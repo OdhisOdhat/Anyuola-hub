@@ -172,9 +172,23 @@ export default function Auth() {
 
                 <form onSubmit={handleAuth} className="space-y-5">
                   {error && (
-                    <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm font-bold">
-                      <AlertCircle className="w-5 h-5 shrink-0" />
-                      {error}
+                    <div className="flex flex-col gap-2 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm font-bold">
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="w-5 h-5 shrink-0" />
+                        <span>{error}</span>
+                      </div>
+                      {isSignUp && error.toLowerCase().includes("already exists") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsSignUp(false);
+                            setError(null);
+                          }}
+                          className="self-start ml-8 text-xs font-black text-emerald-700 hover:text-emerald-800 underline cursor-pointer"
+                        >
+                          Switch to Sign In &rarr;
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -269,10 +283,12 @@ export default function Auth() {
                       : isSignUp ? 'Already have an account?' : "Don't have an account?"
                     }{' '}
                     <button 
+                      type="button"
                       onClick={() => {
                         setIsSignUp(!isSignUp && !isForgotPassword && !isResettingPassword);
                         setIsForgotPassword(false);
                         setIsResettingPassword(false);
+                        setError(null);
                       }}
                       className="text-emerald-600 font-black hover:text-emerald-700 transition-colors"
                     >
@@ -283,6 +299,7 @@ export default function Auth() {
                   {!isResettingPassword && (
                     <div className="pt-2">
                       <button 
+                        type="button"
                         onClick={() => navigate('/contribute?guest=true')}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-50 text-emerald-700 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-100 transition-all border border-emerald-100"
                       >

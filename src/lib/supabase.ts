@@ -1,13 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-
-const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const rawSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-const isPlaceholder = !rawSupabaseUrl || 
-  rawSupabaseUrl.includes('placeholder.supabase.co') || 
-  !rawSupabaseAnonKey || 
-  rawSupabaseAnonKey === 'placeholder';
-
 // Session key in localStorage for Neon-backed authentication
 const SESSION_STORAGE_KEY = 'mro_auth_session';
 let authListeners: Array<(event: string, session: any) => void> = [];
@@ -269,22 +259,15 @@ const genericTableProxy = (table: string) => ({
   }
 });
 
-let clientInstance: any;
+// Always use native Neon PostgreSQL Authentication
+// Decouples the app from dead/paused Supabase projects (e.g. bvzwuizjldgqiltbvfsr.supabase.co)
+// All accounts are persisted directly in Neon PostgreSQL via /api/auth/*
+export const supabase = {
+  auth: neonAuthClient,
+  storage: genericStorage,
+  from: genericTableProxy
+};
 
-if (isPlaceholder) {
-  // Operate in Neon PostgreSQL native auth mode
-  clientInstance = {
-    auth: neonAuthClient,
-    storage: genericStorage,
-    from: genericTableProxy
-  };
-} else {
-  // Real custom Supabase credentials configured
-  const realSupabase = createClient(rawSupabaseUrl, rawSupabaseAnonKey);
-  clientInstance = realSupabase;
-}
-
-export const supabase = clientInstance;
 
 /**
  * BRANDING HELPERS
